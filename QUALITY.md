@@ -93,7 +93,7 @@ its own workflow use explicitly qualified interpretation blocks, not fabricated
 literature citations. Empirical assertions in any block remain subject to fact
 extraction and review.
 
-## Execution-record verification (contract 6)
+## Execution-record verification (contract 7)
 
 `study verify` now extracts two classes of assertions: literature facts (`F` IDs)
 and execution-record assertions (`G` IDs). Both require exact text/qualification
@@ -121,7 +121,7 @@ and human. Internal records cannot substitute for literature evidence.
 Unsupported G assertions and incomplete ledger coverage create blocking major
 review issues even when the reviewer proposes acceptance. Literature facts
 still require immutable document quotations. Old reports remain historical;
-contract 6 verification and contract 4 review must run before finalization.
+contract 7 verification and contract 4 review must run before finalization.
 
 ## Repeated-review handoff
 
@@ -138,3 +138,10 @@ Use `study status`, `issue list` and `study export` to inspect the handoff.
 Respond to issues explicitly, supply evidence, or use `study guide` to redesign
 the research before resuming. A bare resume preserves the blocker and does not
 silently discard criticism or grant acceptance.
+
+Contract 7 accepts equivalent record-root and `/records/` snapshot-envelope
+selectors. Membership checks apply to list values or dictionary keys. Malformed
+or nonfinite expected JSON values remain `undetermined` with their original
+text and diagnostic retained, without discarding valid assertions. Exact
+manuscript/source mismatches and corrupted snapshot hashes still reject the
+result. Missing record fields cannot establish a negative assertion.

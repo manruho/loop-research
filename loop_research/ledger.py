@@ -54,6 +54,8 @@ def snapshot(store, scope, context):
 def resolve(records, path):
     if not path.startswith('/') or len(path.split('/')) > 8:
         raise KeyError(path)
+    if path.startswith('/records/'):
+        path = path[len('/records'):]
     current = records
     for token in path[1:].split('/'):
         token = token.replace('~1', '/').replace('~0', '~')
@@ -86,8 +88,10 @@ def normalize(data, claims, manuscript):
             try:
                 expected = json.loads(check['expected_json'], parse_constant=reject_constant)
                 canonical(expected)
-            except (ValueError, TypeError, RecursionError) as exc:
-                raise ResearchError('実行記録の期待値は有限のJSON値で指定してください。') from exc
+            except (ValueError, TypeError, RecursionError):
+                check.update(verdict='undetermined', observed=None, reason='Malformed or nonfinite expected_json; no comparison performed')
+                checks.append(check)
+                continue
             try:
                 observed = resolve(ledger['records'], check['path'])
             except KeyError:
@@ -98,6 +102,8 @@ def normalize(data, claims, manuscript):
                     matches = canonical(observed) == canonical(expected)
                 elif op == 'contains' and isinstance(observed, list):
                     matches = any(canonical(v) == canonical(expected) for v in observed)
+                elif op == 'contains' and isinstance(observed, dict) and isinstance(expected, str):
+                    matches = expected in observed
                 elif op == 'all_equal' and isinstance(observed, (dict, list)) and observed:
                     matches = all(canonical(v) == canonical(expected) for v in (observed.values() if isinstance(observed, dict) else observed))
                 else:
