@@ -122,6 +122,25 @@ class LedgerAcceptance(unittest.TestCase):
         raw['ledger_claims'][0]['checks'] = [{'path': '/records/searches', 'operator': 'contains', 'expected_json': '"S001"'}]
         self.assertEqual(verification.normalize(data, raw)['ledger_claims'][0]['verdict'], 'supported')
 
+    def test_web_search_configuration_cannot_prove_no_tool_use(self):
+        _, data, raw = self.case()
+        import hashlib
+        block = roles.blocks(data['draft']['content'])[0]
+        block['text'] = 'The author worked without tools.'
+        raw['ledger_claims'][0]['text'] = block['text']
+        data['ledger_snapshot']['records']['author_web_search_config'] = 'disabled'
+        data['ledger_snapshot']['sha256'] = hashlib.sha256(ledger.canonical(data['ledger_snapshot']['records']).encode()).hexdigest()
+        raw['ledger_claims'][0]['checks'] = [{'path': '/author_web_search_config', 'operator': 'equals', 'expected_json': '"disabled"'}]
+        self.assertEqual(verification.normalize(data, raw)['ledger_claims'][0]['verdict'], 'undetermined')
+
+    def test_author_input_snapshot_attests_omission_without_inventing_old_tool_counts(self):
+        workflow, _, _ = self.case()
+        data = workflow.data_for('verify')
+        records = data['ledger_snapshot']['records']
+        self.assertFalse(records['raw_search_responses_supplied'])
+        self.assertNotIn('author_tool_call_count', records)
+        self.assertEqual(records['author_web_search_config'], 'unrecorded')
+
     def test_disputed_evidence_remains_visible_in_record_snapshot(self):
         workflow, _, _ = self.case()
         context = workflow.context(only_claim=workflow.selected())
@@ -193,6 +212,13 @@ class LedgerAcceptance(unittest.TestCase):
                             for f in review['content']['findings']))
         with self.assertRaises(ResearchError):
             workflow.finalize('Cannot finalize contradicted ledger')
+        issue = next(i for i in self.store.list_issues() if i['content']['target_type'] == 'ledger_fact')
+        content = dict(issue['content'], category='scope')
+        from loop_research.common import identifier
+        with self.store.db:
+            self.store.db.execute('UPDATE issues SET content_json=? WHERE id=?', (json.dumps(content), identifier(issue['id'], 'I')))
+        self.assertTrue(any(c['kind'] == 'revise_draft' for c in workflow.choices()))
+        self.assertFalse(any(c['kind'] == 'redesign' for c in workflow.choices()))
 
     def test_substantive_guidance_breaks_old_handoff_basis(self):
         workflow, _ = self.run_with(PersistentReviewer())

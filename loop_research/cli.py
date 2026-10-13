@@ -58,6 +58,11 @@ def parser():
     codex.add_subparsers(dest="action", required=True).add_parser("status")
     evaluation = commands.add_parser("eval", help="公開課題での探索的比較と人間評価")
     actions = evaluation.add_subparsers(dest="action", required=True)
+    extraction = actions.add_parser("extraction")
+    extraction.add_argument("--output", required=True)
+    extraction.add_argument("--model", required=True)
+    extraction.add_argument("--cases", default="benchmarks/extraction-cases.json")
+    extraction.add_argument("--timeout", type=float, default=300)
     evaluate = actions.add_parser("run")
     evaluate.add_argument("--output", required=True)
     evaluate.add_argument("--cases", default="benchmarks/position-papers.json")
@@ -402,7 +407,10 @@ def main(argv=None):
             return 0 if result["chatgpt_authenticated"] else 1
         if args.command == "eval":
             from . import evaluation
-            if args.action == "run":
+            if args.action == "extraction":
+                from .extraction_eval import run
+                result = run(args.output, args.model, args.cases, args.timeout)
+            elif args.action == "run":
                 if not 1 <= args.seconds <= 7200:
                     raise ResearchError("評価の時間上限は1〜7200秒です。")
                 result = evaluation.run_evaluation(args.output, args.cases, args.model, args.review_model, args.seconds, args.resume)

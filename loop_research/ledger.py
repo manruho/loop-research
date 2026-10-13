@@ -21,7 +21,7 @@ def canonical(value):
     return json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(',', ':'), allow_nan=False)
 
 
-def snapshot(store, scope, context):
+def snapshot(store, scope, context, draft=None):
     searches = scope['searches']
     keyword = [s for s in searches if not s['query'].startswith('graph:')]
     readings = [r for r in scope['readings'] if r['research_question'] == store.study_state()['question']]
@@ -47,6 +47,15 @@ def snapshot(store, scope, context):
         'documents': documents,
         'paper_read_pages': {pid: sorted(pages) for pid, pages in paper_pages.items()},
     }
+    if draft and draft.get('task_id'):
+        writer = store.show_task(draft['task_id'])
+        writer_scope = writer['input']['data'].get('context', {}).get('scope', {})
+        if isinstance(writer_scope.get('searches'), list):
+            records['raw_search_responses_supplied'] = any(isinstance(q, dict) and q.get('response') is not None for q in writer_scope['searches'])
+        observation = (writer.get('execution') or {}).get('tool_observation')
+        if observation and not observation['unknown_item_types']:
+            records['author_tool_call_count'] = observation['known_tool_items']
+        records['author_web_search_config'] = writer['config'].get('web_search', 'unrecorded')
     return {'records': records, 'sha256': hashlib.sha256(canonical(records).encode()).hexdigest(),
             'scope': 'Searches are study-wide attempts (including failures and citation traversal); readings belong to the current question; evidence belongs to the selected current claim. Records attest stored activity, not external source truth or exhaustive research.'}
 
@@ -111,6 +120,11 @@ def normalize(data, claims, manuscript):
                     checks.append(check)
                     continue
                 check.update(verdict='supported' if matches else 'contradicted', observed=observed, reason='Deterministic comparison with stored snapshot')
+            if check['path'].removeprefix('/records').startswith('/author_web_search_config') and check['verdict'] == 'supported':
+                action_claim = re.search(r'without\s+tools|no\s+tools|supplied\s+material\s+only|only\s+supplied\s+material|no\s+additional\s+searches', item['text'], re.IGNORECASE)
+                configuration_claim = re.search(r'configur|disabled|enabled|permitted|allowed|設定|無効|有効', item['text'], re.IGNORECASE)
+                if action_claim or not configuration_claim:
+                    check.update(verdict='undetermined', reason='Web-search configuration cannot establish actual tool use, search execution or exclusive source use')
             checks.append(check)
         verdicts = {c['verdict'] for c in checks}
         item['extraction_reason'] = item['reason']
