@@ -79,7 +79,7 @@ class FixtureEngine:
                 coverage.append({"block_id": block["id"], "status": "complete" if factual else "no_facts", "reason": "Explicit synthetic fixture coverage"})
                 if factual:
                     eid = next(iter(data["source_spans"]))
-                    facts.append({"id": "F001", "block_id": block["id"], "text": block["text"], "occurrence": 1,
+                    facts.append({"id": "F001", "block_id": block["id"], "field": "text", "text": block["text"], "occurrence": 1,
                                   "sources": [{"evidence_id": eid, "quote": data["source_spans"][eid]["quote"], "occurrence": 1}],
                                   "verdict": "supported", "reason": "Synthetic passage only", "qualification": "Synthetic evidence is not a real scientific result."})
             result = {"facts": facts, "coverage": coverage, "limitations": notes}

@@ -17,11 +17,12 @@ from html.parser import HTMLParser
 from pathlib import Path
 
 from .common import ResearchError, canonical_text, label, required
+from . import __version__
 
 
 MAX_METADATA = 4 * 1024 * 1024
 MAX_DOCUMENT = 20 * 1024 * 1024
-USER_AGENT = "loop-research/0.3 (local academic research; https://github.com/manruho/loop-research)"
+USER_AGENT = f"loop-research/{__version__} (local academic research; https://github.com/manruho/loop-research)"
 ARXIV_ID = re.compile(r"(?:\d{4}\.\d{4,5}|[a-zA-Z.-]+/\d{7})(?:v[1-9]\d*)?\Z")
 
 

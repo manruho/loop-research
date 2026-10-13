@@ -93,7 +93,8 @@ class ResearchWorkflow:
             return None
         if artifact["input"].get("contract_version") != roles.PROMPT_VERSIONS["verify"]:
             return None
-        expected = self.engine_for("verify").config
+        settings = self.store.study_state()["settings"]
+        expected = self.engine.config if self.injected_engine else {"model": settings["review_model"], "reasoning_effort": settings["review_effort"]}
         task = self.store.show_task(artifact["task_id"]) if artifact["task_id"] else None
         if not task or any(task["config"].get(k) != expected.get(k) for k in ("model", "reasoning_effort")):
             return None
@@ -230,7 +231,8 @@ class ResearchWorkflow:
                 artifact = self.store.show_artifact(entry["id"])
                 if artifact["input"].get("contract_version") != roles.PROMPT_VERSIONS["review"]:
                     continue
-                config = self.engine_for("review").config
+                settings = state["settings"]
+                config = self.engine.config if self.injected_engine else {"model": settings["review_model"], "reasoning_effort": settings["review_effort"]}
                 task = self.store.show_task(artifact["task_id"]) if artifact["task_id"] else None
                 if task and all(task["config"].get(k) == config.get(k) for k in ("model", "reasoning_effort")):
                     verified = self.current_verification()
@@ -301,7 +303,9 @@ class ResearchWorkflow:
                     start, end = verification.locate(self.store.document_page(source["document_id"], source["page"]), stored["quote"])
                     spans[eid] = {"document_id": source["document_id"], "page": source["page"], "start": start, "end": end,
                                   "quote": stored["quote"], "sha256": doc["sha256"], "source_version": doc["source_version"],
-                                  "level": stored["level"], "human_status": stored["status"], "extractor": doc["extractor"]}
+                                  "level": stored["level"], "human_status": stored["status"], "extractor": doc["extractor"],
+                                  "linkage": "host-validated evidence_documents mapping and exact page substring",
+                                  "source_url": doc["source_url"] if doc["source_url"].startswith(("https://", "http://")) else "local immutable document snapshot"}
                 common["source_spans"] = spans
                 # Verification needs actual manuscript and source spans, not repeated abstracts/quotes.
                 common["context"] = {"question": context["question"], "claims": context["claims"],
@@ -734,7 +738,12 @@ class ResearchWorkflow:
                 current_draft = self.current_artifact("draft")
             except ResearchError:
                 pass
+        verified = self.current_verification() if current_draft else None
+        from collections import Counter
         return {
+            "current_verification": verified["id"] if verified else None,
+            "fact_verdicts": dict(Counter(f["verdict"] for f in verified["content"]["facts"])) if verified else None,
+            "reviewer_independence": "different explicitly requested model; same provider, actual model may be unconfirmed",
             "state": state, "candidates": list(self.candidates().values()),
             "tasks": self.store.list_tasks(), "artifacts": self.store.list_artifacts(),
             "issues": self.store.list_issues(), "scope": self.scope(),

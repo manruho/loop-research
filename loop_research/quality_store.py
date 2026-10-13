@@ -41,6 +41,8 @@ class QualityStore:
         rows = []
         for row in self.db.execute("SELECT * FROM facts WHERE verification_id=? ORDER BY fact_id", (vid,)):
             item = dict(row)
+            location = item["block_id"].split(":", 1)
+            item["block_id"], item["field"] = location[0], location[1] if len(location) > 1 else "text"
             item["sources"] = [dict(r) for r in self.db.execute(
                 "SELECT * FROM fact_evidence WHERE verification_id=? AND fact_id=? ORDER BY evidence_id,start", (vid, item["fact_id"]))]
             rows.append(item)
@@ -53,7 +55,7 @@ class QualityStore:
         vid, did = identifier(uid, "U"), identifier(data["draft"]["id"], "A")
         for fact in result["facts"]:
             self.db.execute("INSERT INTO facts VALUES(?,?,?,?,?,?,?,?,?,?)",
-                            (vid, fact["id"], did, fact["block_id"], fact["start"], fact["end"], fact["text"],
+                            (vid, fact["id"], did, fact["block_id"] + ":" + fact["field"], fact["start"], fact["end"], fact["text"],
                              fact["verdict"], fact["reason"], fact["qualification"]))
             for source in fact["sources"]:
                 self.db.execute("INSERT INTO fact_evidence VALUES(?,?,?,?,?,?,?,?)",

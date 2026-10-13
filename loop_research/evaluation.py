@@ -197,9 +197,10 @@ def run_evaluation(output, cases_path, model, review_model, seconds=1800, resume
         return report(root)
 
 
-def anonymize(text):
+def anonymize(text, record_ids=()):
     text = re.sub(r"<!--.*?-->", "", text, flags=re.S)
-    text = re.sub(r"\b[CEPDUBAV][0-9]{3,}\b", "[record]", text)
+    for record_id in sorted(set(record_ids), key=len, reverse=True):
+        text = re.sub(r"\b" + re.escape(record_id) + r"\b", "[record]", text)
     text = re.sub(r"^>.*(?:historical|withdrawn|ready_for_human|finalized).*\n", "", text, flags=re.M|re.I)
     return text.strip() + "\n"
 
@@ -207,6 +208,9 @@ def anonymize(text):
 def packet(output, reviewer_model):
     root = Path(output).resolve()
     manifest = read(root / "manifest.json")
+    expected = {(case["id"], method) for case in manifest["cases"]["cases"] for method in ("baseline", "harness")}
+    if len(manifest["runs"]) != 6 or {(run["case_id"], run["method"]) for run in manifest["runs"]} != expected:
+        raise ResearchError("3課題×2方式の終了記録が揃ってから評価票を作成してください。")
     target = root / "blind-packet"
     if target.exists():
         raise ResearchError("評価票は既存です。上書きしません。")
@@ -222,14 +226,27 @@ def packet(output, reviewer_model):
             case = next(c for c in manifest["cases"]["cases"] if c["id"] == run["case_id"])
             draft = root / run["path"] / "draft.md"
             successful = draft.exists() and run["status"] not in ("failed", "timed_out", "interrupted")
-            text = anonymize(draft.read_text()) if successful else "No current manuscript. Quality scores are missing, not zero.\n"
+            record_ids = set()
+            if run["method"] == "harness":
+                def collect(value):
+                    if isinstance(value, dict):
+                        for key, item in value.items():
+                            if (key == "id" or key.endswith("_id")) and isinstance(item, str) and re.fullmatch(r"[A-Z][0-9]{3,}", item):
+                                record_ids.add(item)
+                            collect(item)
+                    elif isinstance(value, list):
+                        for item in value: collect(item)
+                for name in ("claims.json", "evidence.json", "literature.json", "artifacts.json"):
+                    source = root / run["path"] / "export" / name
+                    if source.exists(): collect(read(source))
+            text = anonymize(draft.read_text(), record_ids) if successful else "No current manuscript. Quality scores are missing, not zero.\n"
             (stage / (code + ".md")).write_text("# " + code + "\n\n" + case["question"] + "\n\n" + text)
             facts = []
             limitation = "No manuscript"
             if successful:
                 extracted, execution = CodexEngine(reviewer_model, 240, "low").execute(
                     "evaluation-extraction", {"manuscript": text},
-                    "Extract every empirically checkable assertion, including mixed/normative paragraphs, as an exact contiguous substring. Preserve negation, population and numbers. No grading, paraphrase or support verdict. Report omissions and uncertainty.", FACT_EXTRACTION)
+                    "Extract every empirically checkable assertion, including mixed/normative paragraphs, as an exact contiguous substring. Preserve negation, population and numbers. Exclude explicit conjectures, normative premises and analytic/logical arguments that are not empirical claims. No grading, paraphrase or support verdict. Report omissions and uncertainty.", FACT_EXTRACTION)
                 validate(extracted, FACT_EXTRACTION)
                 facts = list(dict.fromkeys(extracted["facts"]))
                 if any(f not in text for f in facts):

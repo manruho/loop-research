@@ -307,4 +307,4 @@ PROMPT_VERSIONS = {kind: 2 for kind in PROMPTS}
 
 from .verification import PROMPT as VERIFY_PROMPT
 PROMPTS["verify"] = VERIFY_PROMPT
-PROMPT_VERSIONS["verify"] = 2
+PROMPT_VERSIONS["verify"] = 4

@@ -159,13 +159,16 @@ class QualityAcceptance(unittest.TestCase):
         self.assertNotIn("No search A position", roles.PROMPTS["comparison"])
         self.assertNotIn("Distinguish absent evidence Check", roles.PROMPTS["review"])
         self.assertIn("Distinguish lack of evidence from evidence against the claim.", roles.PROMPTS["review"])
+        self.assertIn("A live URL is NOT", roles.PROMPTS["verify"])
+        self.assertIn("analytic/logical", roles.PROMPTS["verify"])
         self.assertEqual(set(roles.PROMPTS), set(roles.PROMPT_VERSIONS))
 
     def test_anonymization_removes_host_record_identifiers(self):
-        result = anonymize('Text E001 and C002.\n<!-- block:B001 claims:C002 -->\n')
+        result = anonymize('Text E001 and C002 on A100 GPUs.\n<!-- block:B001 claims:C002 -->\n', {"E001", "C002", "B001"})
         self.assertNotIn("E001", result)
         self.assertNotIn("<!--", result)
         self.assertIn("[record]", result)
+        self.assertIn("A100 GPUs", result)
 
     def test_citation_discovery_enters_acquisition_and_draft(self):
         self.store.configure_study("Exercise graph acquisition", settings={"citation_seeds": 1, "citation_limit": 1, "citation_budget": 1, "paper_limit": 1})
@@ -200,6 +203,37 @@ class QualityAcceptance(unittest.TestCase):
             workflow.perform("verify")
         self.assertNotEqual(workflow.current_verification()["id"], before["id"])
         self.assertIsNone(workflow.latest_relevant_review())
+
+    def test_mixed_paragraph_facts_and_qualification_have_separate_spans(self):
+        workflow = self.full()
+        data = workflow.data_for("verify")
+        raw, _ = FixtureEngine().execute("verify", data, "", {})
+        first = raw["facts"][0]
+        block = next(b for b in roles.blocks(data["draft"]["content"]) if b["id"] == first["block_id"])
+        block["text"] += " A wider population was tested."
+        block["qualification"] = "A wider population was tested."
+        second = copy.deepcopy(first)
+        second.update(id="F002", text="A wider population was tested.", sources=[], verdict="undetermined", qualification="No population evidence")
+        third = copy.deepcopy(second)
+        third.update(id="F003", field="qualification")
+        raw["facts"] += [second, third]
+        result = verification.normalize(data, raw)
+        self.assertEqual(len(verification.blocking(result)), 2)
+        self.assertEqual(result["facts"][0]["verdict"], "supported")
+        self.assertEqual(result["facts"][2]["field"], "qualification")
+        fact = result["facts"][2]
+        self.assertEqual(block["qualification"][fact["start"]:fact["end"]], fact["text"])
+
+    def test_uncited_support_is_host_adjustment_and_model_verdict_is_preserved(self):
+        workflow = self.full()
+        data = workflow.data_for("verify")
+        raw, _ = FixtureEngine().execute("verify", data, "", {})
+        block = next(b for b in roles.blocks(data["draft"]["content"]) if b["id"] == raw["facts"][0]["block_id"])
+        block["evidence_ids"] = []
+        result = verification.normalize(data, raw)
+        self.assertEqual(result["facts"][0]["model_verdict"], "supported")
+        self.assertEqual(result["facts"][0]["verdict"], "partial")
+        self.assertTrue(result["facts"][0]["host_adjustments"])
 
     def test_http_retry_is_bounded_and_secrets_are_not_recorded(self):
         import urllib.error
