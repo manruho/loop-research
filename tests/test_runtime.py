@@ -64,6 +64,7 @@ class RuntimeAcceptance(unittest.TestCase):
         self.db = self.root / "study.sqlite3"
         store = ResearchStore(self.db, initialize=True)
         store.init("Synthetic runtime question")
+        store.configure_study("Explicit test models", settings={"model": "fixture-author", "review_model": "fixture-reviewer"})
         store.close()
 
     def tearDown(self):

@@ -17,11 +17,12 @@ from html.parser import HTMLParser
 from pathlib import Path
 
 from .common import ResearchError, canonical_text, label, required
+from . import __version__
 
 
 MAX_METADATA = 4 * 1024 * 1024
 MAX_DOCUMENT = 20 * 1024 * 1024
-USER_AGENT = "loop-research/0.3 (local academic research; https://github.com/manruho/loop-research)"
+USER_AGENT = f"loop-research/{__version__} (local academic research; https://github.com/manruho/loop-research)"
 ARXIV_ID = re.compile(r"(?:\d{4}\.\d{4,5}|[a-zA-Z.-]+/\d{7})(?:v[1-9]\d*)?\Z")
 
 
@@ -61,22 +62,41 @@ def arxiv_api_slot():
             fcntl.flock(handle, fcntl.LOCK_UN)
 
 
-def get_bytes(url, maximum, timeout=25, arxiv_api=False):
+def get_bytes(url, maximum, timeout=25, arxiv_api=False, headers=None, retries=0, rate_slot=None):
     http_url(url)
+    if rate_slot:
+        with provider_slot(rate_slot):
+            return get_bytes(url, maximum, timeout, arxiv_api, headers, retries)
     slot = arxiv_api_slot() if arxiv_api else contextlib.nullcontext()
     try:
         with slot:
-            request = urllib.request.Request(url, headers={"User-Agent": USER_AGENT, "Accept": "*/*"})
-            with urllib.request.urlopen(request, timeout=timeout) as response:
+            request = urllib.request.Request(url, headers={"User-Agent": USER_AGENT, "Accept": "*/*", **(headers or {})})
+            with urllib.request.build_opener(SafeRedirect()).open(request, timeout=timeout) as response:
                 final_url = http_url(response.geturl())
                 payload = response.read(maximum + 1)
                 if len(payload) > maximum:
                     raise ResearchError(f"取得資料が上限{maximum // (1024 * 1024)}MBを超えています。")
                 return payload, final_url
     except urllib.error.HTTPError as exc:
+        if retries and exc.code in (429, 500, 502, 503, 504):
+            delay = exc.headers.get("Retry-After", "2") if exc.headers else "2"
+            try:
+                delay = min(10, max(1, float(delay)))
+            except ValueError:
+                delay = 2
+            time.sleep(delay)
+            return get_bytes(url, maximum, timeout, arxiv_api, headers, retries-1)
         raise ResearchError(f"取得先がHTTP {exc.code}を返しました。アクセス制限や一時的な障害の可能性があります。") from exc
     except (urllib.error.URLError, TimeoutError, socket.timeout) as exc:
         raise ResearchError("取得先へ接続できませんでした。通信状態を確認して再実行してください。") from exc
+
+
+class SafeRedirect(urllib.request.HTTPRedirectHandler):
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        target = super().redirect_request(req, fp, code, msg, headers, newurl)
+        if target is not None and urllib.parse.urlsplit(req.full_url).hostname != urllib.parse.urlsplit(newurl).hostname:
+            target.remove_header("Authorization")
+        return target
 
 
 class PlainMarkup(HTMLParser):
@@ -153,6 +173,7 @@ def arxiv_expression(query):
         tokens = list(lexer)
     except ValueError as exc:
         raise ResearchError("arXiv検索語の引用符が閉じられていません。") from exc
+    tokens = [part for token in tokens for part in (list(token) if token and set(token) <= {"(", ")"} else [token])]
     operators = {"AND", "OR", "ANDNOT"}
     fields = {"ti", "au", "abs", "co", "jr", "cat", "rn", "id", "all"}
     advanced = any(token in operators or token in ("(", ")")
@@ -176,12 +197,15 @@ def search_papers(store, query, provider="crossref", limit=5):
     query = required(query, "検索語")
     if not 1 <= limit <= 20:
         raise ResearchError("検索件数は1〜20件で指定してください。")
+    if provider == "openalex":
+        from .discovery import search_openalex
+        return search_openalex(store, query, limit)
     if provider == "crossref":
         url = "https://api.crossref.org/works?" + urllib.parse.urlencode({"query.bibliographic": query, "rows": limit})
     elif provider == "arxiv":
         url = "https://export.arxiv.org/api/query?" + urllib.parse.urlencode({"search_query": arxiv_expression(query), "start": 0, "max_results": limit, "sortBy": "relevance"})
     else:
-        raise ResearchError("検索先はcrossrefまたはarxivを指定してください。")
+        raise ResearchError("検索先はcrossref / arxiv / openalexを指定してください。")
     sid = store.start_search(provider, query, limit, url)
     try:
         payload, _ = get_bytes(url, MAX_METADATA, arxiv_api=provider == "arxiv")
@@ -299,3 +323,26 @@ def fetch_paper(store, paper, url=None, file=None, abstract=False):
         else:
             store.fail_fetch(fid, str(exc))
         raise ResearchError(f"{label(fid, 'F')}: {exc}") from exc
+
+
+@contextlib.contextmanager
+def provider_slot(provider):
+    import fcntl
+    path = Path.home() / ".cache" / "loop-research" / (provider + "-api.lock")
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("a+") as handle:
+        fcntl.flock(handle, fcntl.LOCK_EX)
+        handle.seek(0)
+        try:
+            last = float(handle.read() or "0")
+        except ValueError:
+            last = 0
+        time.sleep(max(0, min(1, 1 - (time.time() - last))))
+        try:
+            yield
+        finally:
+            handle.seek(0)
+            handle.truncate()
+            handle.write(str(time.time()))
+            handle.flush()
+            fcntl.flock(handle, fcntl.LOCK_UN)

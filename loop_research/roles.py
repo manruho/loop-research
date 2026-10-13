@@ -11,7 +11,7 @@ NOTES = array(TEXT, minimum=1, maximum=12)
 IDS = array(string(minimum=1, maximum=30), maximum=30)
 KINDS = ("observation", "author_interpretation", "proposal", "hypothesis")
 CLAIM_KINDS = ("descriptive", "interpretive", "normative", "proposal", "hypothesis")
-QUERY = obj(query=string(minimum=1, maximum=160), provider=string(("arxiv", "crossref")), purpose=TEXT)
+QUERY = obj(query=string(minimum=1, maximum=160), provider=string(("arxiv", "crossref", "openalex")), purpose=TEXT)
 ORIENTATION = obj(
     interpretation=TEXT, domains=array(TEXT, minimum=1, maximum=8),
     search_queries=array(QUERY, minimum=1, maximum=10),
@@ -66,14 +66,14 @@ DRAFT = obj(
 FINDING = obj(
     severity=string(("critical", "major", "minor")),
     category=string(("novelty", "citation", "logic", "counterexample", "scope", "contribution")),
-    target_type=string(("draft", "block", "claim", "evidence", "paper")),
+    target_type=string(("draft", "block", "fact", "claim", "evidence", "paper")),
     target_id=string(minimum=1, maximum=30), explanation=TEXT, evidence_ids=IDS,
     suggested_action=string(("search", "read", "redesign", "revise", "withdraw", "hold")),
     remaining_uncertainty=TEXT,
 )
 REVIEW = obj(
     decision=string(("ready_for_human", "revise", "hold", "withdraw")),
-    synthesis=TEXT, findings=array(FINDING, maximum=20),
+    synthesis=TEXT, findings=array(FINDING, maximum=100),
     requested_searches=array(QUERY, maximum=5), unresolved=NOTES,
     prior_issue_assessments=array(obj(issue_id=string(minimum=1, maximum=30),
                                      status=string(("resolved", "persists", "not_applicable")),
@@ -92,7 +92,8 @@ DECISION = obj(choice_id=string(minimum=1, maximum=30), reason=TEXT, uncertainty
 PROMPTS = {
     "orientation": (
         "Interpret the research question, identify adjacent fields and competing concepts, and "
-        "propose concise English search queries. arxiv uses literal phrase queries: prefer short "
+        "propose concise English search queries covering synonyms, adjacent disciplines, and counterevidence. "
+        "Use arxiv, crossref and openalex across distinct purposes. arxiv supports short phrases and explicit Boolean queries: prefer "
         "established phrases (e.g. AI Scientist, automation bias), not long invented sentences. "
         "Include negative/competing searches. Recommend consultation only for a material ambiguity."
     ),
@@ -115,7 +116,7 @@ PROMPTS = {
     ),
     "comparison": (
         "Compare every supplied candidate without numeric novelty scores. Select one tentative position "
-        "only if it has a defensible contribution, explicit limits and some grounded evidence. No search "
+        "only if it has a defensible contribution, explicit limits and some grounded evidence. No search proves novelty. "
         "A position paper may make a normative or conceptual contribution without a new experiment. "
         "Lack of measured efficacy is not by itself a reason to reject a clearly justified value premise "
         "and limited proposal; disclose efficacy as a hypothesis to test. Unconfirmed novelty must be "
@@ -149,14 +150,16 @@ PROMPTS = {
         "Act as a critical reviewer in a fresh context. You receive the manuscript, source excerpts, "
         "reading/search scope, and prior issues/responses, not the writer's private reasoning. Inspect "
         "novelty, fairness to prior work, citation support, logical leaps, strongest counterexamples, "
-        "scope and venue contribution. Target exact supplied block/draft/claim/evidence/paper IDs. "
-        "Each criticism needs a reason and suggested repair, not a score. Distinguish absent evidence "
+        "scope and venue contribution. Inspect verification.coverage and facts for extraction omissions, "
+        "compound assertions, numbers, populations, negation and causal leaps. A citation on a paragraph "
+        "does not establish support for each assertion. Target exact supplied fact/block/draft/claim/evidence/paper IDs; F IDs are scoped to the supplied verification artifact. "
+        "Each criticism needs a reason and suggested repair, not a score. "
         "Check that block kinds are honest: labeling an empirical assertion as a position must not evade evidence requirements. "
-        "from evidence against the claim. Do not close a prior issue merely because wording changed. "
+        "Distinguish lack of evidence from evidence against the claim. Do not close a prior issue merely because wording changed. "
         "Explicitly reassess every unresolved critical/major prior issue in prior_issue_assessments. "
-        "Explain substantive repairs or why a changed thesis makes the issue not applicable; preserves "
+        "Explain substantive repairs or why a changed thesis makes the issue not applicable; preserve "
         "uncertainty. A persisting major issue prevents ready_for_human. "
-        "ready_for_human requires no critical or major unaddressed issue; it is not publication approval."
+        "ready_for_human requires supported fact judgments and complete extraction coverage, with no critical or major unaddressed issue; it is not publication approval."
     ),
     "redesign": (
         "Respond to the critical review by changing research, not just polishing language. If the problem "
@@ -231,7 +234,13 @@ def validate_semantics(kind, data, result):
                     raise ResearchError("事実を述べる前提に根拠がありません。")
             for objection in section["counterarguments"]:
                 check_ids(objection["evidence_ids"], evidences, "反論の根拠")
-    elif kind == "draft":
+    elif kind in ("draft", "revise_draft"):
+        if kind == "revise_draft":
+            previous = data["previous_draft"]["content"]
+            old_blocks = [(b["text"], b["kind"], b["evidence_ids"], b["qualification"]) for b in blocks(previous)]
+            new_blocks = [(b["text"], b["kind"], b["evidence_ids"], b["qualification"]) for b in blocks(result)]
+            if old_blocks == new_blocks:
+                raise ResearchError("草稿の本文・引用・限定条件が変更されていません。")
         required_roles = {"introduction", "related_work", "position", "counterarguments",
                           "implications", "limitations", "conclusion"}
         if {section["role"] for section in result["sections"]} != required_roles:
@@ -254,8 +263,12 @@ def validate_semantics(kind, data, result):
                 if limited and not block["qualification"].strip():
                     raise ResearchError("限定的・未確認の根拠に基づく事実に留保がありません。")
     elif kind == "review":
+        from .verification import blocking
+        if result["decision"] == "ready_for_human" and blocking(data["verification"]["content"]):
+            raise ResearchError("未支持の事実主張や抽出不足を残したまま人間確認へ進めません。")
         targets = {"draft": {data["draft"]["id"]}, "block": {b["id"] for b in blocks(data["draft"]["content"])},
-                   "claim": set(claims), "evidence": set(evidences), "paper": set(papers)}
+                   "claim": set(claims), "evidence": set(evidences), "paper": set(papers),
+                   "fact": {f["id"] for f in data["verification"]["content"]["facts"]}}
         for finding in result["findings"]:
             if finding["target_id"] not in targets[finding["target_type"]]:
                 raise ResearchError("査読の指摘先が入力に存在しません。")
@@ -295,3 +308,24 @@ def validate_semantics(kind, data, result):
         if result["choice_id"] not in {choice["choice_id"] for choice in data["choices"]}:
             raise ResearchError("許可されていない次の作業が選ばれました。")
     return result
+
+
+PROMPT_VERSIONS = {kind: 2 for kind in PROMPTS}
+
+from .verification import PROMPT as VERIFY_PROMPT
+PROMPTS["verify"] = VERIFY_PROMPT
+PROMPT_VERSIONS["verify"] = 4
+
+PROMPTS["revise_draft"] = (
+    "Revise the supplied English manuscript to address the supplied citation/fact verification issues. "
+    "Keep the selected central claim unchanged; do not silently revise its thesis. Correct unsupported "
+    "numbers, populations and factual generalizations, cite actual supplied evidence, or remove unsupported "
+    "assertions. Preserve normative premises and openly qualified hypotheses without fabricating support. "
+    "The result must substantively change the manuscript, not just its title. Return a full replacement "
+    "DRAFT with the same seven section roles, claim mapping, and English source limitations. Use only "
+    "supplied E IDs; the host adds citations. Do not claim that the fix is verified: it will be verified "
+    "and reviewed again, including prior unresolved issues."
+)
+PROMPT_VERSIONS["revise_draft"] = 1
+
+PROMPT_VERSIONS["review"] = 3

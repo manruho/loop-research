@@ -1,0 +1,33 @@
+{
+  "version": 1,
+  "limitations": "Three exploratory cases, one run per method. Reference sets are limited, not exhaustive ground truth. Human relevance/support assessment is pending.",
+  "cases": [
+    {
+      "id": "research-history",
+      "question": "研究エージェントは根拠の不確実性と主張の撤回履歴を研究成果として公開すべきか",
+      "seed": {"arxiv": "2408.06292v3", "title": "The AI Scientist: Towards Fully Automated Open-Ended Scientific Discovery"},
+      "references": [
+        {"id": "arxiv:2408.06292", "url": "https://arxiv.org/abs/2408.06292v3", "reason": "Automated research pipeline and internal review; public primary paper."},
+        {"id": "arxiv:2504.08066", "url": "https://arxiv.org/abs/2504.08066", "reason": "Subsequent research-agent pipeline; useful competing scope, not evidence for a disclosure obligation."}
+      ]
+    },
+    {
+      "id": "checking-workload",
+      "question": "人間とAIの共同作業では回答精度に加えて検証負担を評価すべきか",
+      "seed": {"arxiv": "2102.09692", "title": "To Trust or to Think: Cognitive Forcing Functions Can Reduce Overreliance on AI in AI-assisted Decision-making"},
+      "references": [
+        {"id": "arxiv:2102.09692", "url": "https://arxiv.org/abs/2102.09692", "reason": "Human-AI reliance and cognitive forcing; tradeoff relevant to effort."},
+        {"id": "arxiv:2403.12108", "url": "https://arxiv.org/abs/2403.12108", "reason": "Comparison of human, AI and joint decisions; performance counterpoint."}
+      ]
+    },
+    {
+      "id": "contextual-evaluation",
+      "question": "言語モデルの評価では単一の総合順位より利用場面ごとの限界を優先して提示すべきか",
+      "seed": {"arxiv": "2211.09110", "title": "Holistic Evaluation of Language Models"},
+      "references": [
+        {"id": "arxiv:2211.09110", "url": "https://arxiv.org/abs/2211.09110", "reason": "Multi-scenario evaluation; overlap must be acknowledged."},
+        {"id": "arxiv:1803.09010", "url": "https://arxiv.org/abs/1803.09010", "reason": "Documentation of intended use and dataset limits; related conceptual contribution."}
+      ]
+    }
+  ]
+}

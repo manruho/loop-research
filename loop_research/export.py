@@ -145,7 +145,7 @@ def export_study(store, output, include_sources=False):
             "papers": [store.show_paper(item["id"]) for item in store.list_papers()],
             "documents": store.list_documents(),
             "searches": [store.show_search(item["id"]) for item in store.list_searches()],
-            "reading_scope": workflow.scope(),
+            "reading_scope": workflow.scope(), "citation_graph": store.citation_graph(),
         }
         graph = {"question": state["question"], "claims": claims, "edges": store.claim_graph(),
                  "domains": [a["content"]["domains"] for a in artifacts if a["kind"] == "orientation"]}
@@ -154,6 +154,7 @@ def export_study(store, output, include_sources=False):
             "manifest.json": None,
             "study.json": json_text(summary), "research-map.json": json_text(graph),
             "claims.json": json_text(claims), "evidence.json": json_text(evidence),
+            "fact-verification.json": json_text([{"artifact": store.show_artifact(v["id"]), "facts": store.verification_rows(v["id"])} for v in store.list_artifacts("verify")]),
             "literature.json": json_text(literature), "artifacts.json": json_text(artifacts),
             "tasks.json": json_text([store.show_task(item["id"]) for item in store.list_tasks()]),
             "decisions.json": json_text(decisions), "reviews.json": json_text(store.list_issues()),

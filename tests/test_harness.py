@@ -28,6 +28,7 @@ class HarnessAcceptance(unittest.TestCase):
 
     def run_study(self, engine=None, steps=40, reason=None):
         engine = engine or FixtureEngine()
+        self.store.configure_study("Offline fixture has no citation provider", settings={"citation_seeds": 0})
         workflow = ResearchWorkflow(self.store, engine)
         with patch("loop_research.workflow.search_papers", fake_search), patch("loop_research.workflow.fetch_paper", fake_fetch), contextlib.redirect_stderr(io.StringIO()):
             result = workflow.run(steps, resume_reason=reason)
@@ -134,6 +135,7 @@ class HarnessAcceptance(unittest.TestCase):
         with self.assertRaises(ResearchError):
             workflow.finalize("No review of the new manuscript")
         with contextlib.redirect_stderr(io.StringIO()):
+            workflow.perform("verify")
             workflow.perform("review")
         self.assertEqual(workflow.latest_relevant_review()["input"]["draft"]["id"], imported["id"])
         self.assertEqual(len(self.store.list_artifacts("draft")), 2)

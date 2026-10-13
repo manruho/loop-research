@@ -8,11 +8,12 @@ from .common import ResearchError, identifier, label, now, required
 
 ARTIFACT_PREFIXES = {
     "orientation": "N", "reading": "L", "comparison": "K",
-    "outline": "O", "draft": "A", "review": "V", "decision": "J", "redesign": "Z",
+    "outline": "O", "draft": "A", "review": "V", "verify": "U", "decision": "J", "redesign": "Z",
 }
 PREFIX_KINDS = {value: key for key, value in ARTIFACT_PREFIXES.items()}
-DEFAULT_SETTINGS = {"provider": "arxiv", "paper_limit": 5, "pages_per_document": 2,
-                    "query_limit": 3, "model": None, "timeout": 180, "reasoning_effort": "medium"}
+DEFAULT_SETTINGS = {"provider": "arxiv", "paper_limit": 12, "pages_per_document": 2,
+                    "query_limit": 6, "model": None, "timeout": 180, "reasoning_effort": "medium", "review_model": None, "review_effort": "low",
+                    "citation_seeds": 3, "citation_limit": 10, "citation_budget": 30}
 OWNER_SCHEMA = """
 ALTER TABLE searches ADD COLUMN owner_pid INTEGER;
 ALTER TABLE searches ADD COLUMN owner_identity TEXT;
@@ -118,13 +119,18 @@ class WorkflowStore:
         if settings:
             merged = dict(before["settings"])
             merged.update(settings)
-            if merged["provider"] not in ("arxiv", "crossref"):
+            if merged["provider"] not in ("arxiv", "crossref", "openalex"):
                 raise ResearchError("検索先が不正です。")
-            for key, maximum in (("paper_limit", 20), ("pages_per_document", 20), ("query_limit", 10)):
-                if type(merged[key]) is not int or not 1 <= merged[key] <= maximum:
+            for key, maximum in (("paper_limit", 20), ("pages_per_document", 20), ("query_limit", 10), ("citation_seeds", 10), ("citation_limit", 20), ("citation_budget", 100)):
+                if type(merged[key]) is not int or not (0 if key.startswith("citation_") else 1) <= merged[key] <= maximum:
                     raise ResearchError(f"{key}が有効な範囲にありません。")
+            if merged["review_effort"] not in ("low", "medium", "high", "xhigh", "max", "ultra"):
+                raise ResearchError("査読の推論の強さが不正です。")
+            if merged["review_model"] and merged["model"] == merged["review_model"]:
+                raise ResearchError("執筆と査読には異なるモデルを指定してください。")
             from .codex import validate_review_options
             validate_review_options(merged["timeout"], merged["model"])
+            validate_review_options(merged["timeout"], merged["review_model"])
             if merged["reasoning_effort"] not in ("low", "medium", "high", "xhigh", "max", "ultra"):
                 raise ResearchError("推論の強さが不正です。")
             changes["settings_json"] = encoded(merged)
@@ -138,6 +144,9 @@ class WorkflowStore:
                            status="active", phase="orientation")
         elif any(key in changes for key in ("audience", "venue")):
             changes.update(status="active", phase="reconsider")
+        if settings and any(before["settings"].get(k) != settings[k] for k in ("model", "review_model", "review_effort") if k in settings):
+            if before["status"] in ("ready_for_human", "finalized"):
+                changes.update(status="active", phase="review")
         with self.db:
             self._set_study(reason, **changes)
             self.event("study.configured", reason, {"before": before, "after": self.study_state(),
@@ -259,6 +268,7 @@ class WorkflowStore:
             "documents": rows("SELECT id,sha256,status,extractor FROM documents ORDER BY id"),
             "evidence": rows("SELECT * FROM evidence ORDER BY id"),
             "links": rows("SELECT * FROM evidence_documents ORDER BY evidence_id"),
+            "citation_edges": rows("SELECT * FROM citation_edges ORDER BY search_id,citing_id,cited_id"),
             "artifacts": rows("SELECT id,kind,semantic_key FROM artifacts WHERE kind!='decision' ORDER BY id"),
             "issues": rows("SELECT id,status,response,remaining_uncertainty FROM issues ORDER BY id"),
             "operator_decisions": rows("SELECT id,action,reason FROM events WHERE action='study.guidance' OR action='issue.responded' OR (action='study.claim_selected' AND json_extract(payload,'$.actor')='human') OR (action='study.configured' AND json_extract(payload,'$.research_changed')=1) ORDER BY id"),
@@ -497,6 +507,11 @@ class WorkflowStore:
         self.event("draft.created", "根拠と主張に対応する英語草稿を保存",
                    {"draft_id": artifact, "claim_id": data["claim_id"], "basis": data["basis"]})
         self._set_study("草稿は作成済み。学術的な確認と内部査読は未完了。", phase="review")
+
+    def apply_revise_draft(self, tid, key, data, result):
+        self.apply_draft(tid, key, data, result)
+        self.event("draft.revised", "査読に基づく草稿の修正。中心主張の版は保持し、再検証・再査読する。",
+                   {"previous_draft": data["previous_draft"]["id"], "review_id": data["review"]["id"], "claim_id": data["claim_id"]})
 
     def apply_review(self, tid, key, data, result):
         draft = self.artifact_row(data["draft"]["id"])

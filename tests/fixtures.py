@@ -60,7 +60,7 @@ class FixtureEngine:
                                                           "response": "Use it alongside detectability", "evidence_ids": eids}],
                                     "limitations": notes} for heading in ("Introduction", "Argument", "Limits")],
                       "open_questions": notes}
-        elif kind == "draft":
+        elif kind in ("draft", "revise_draft"):
             def block(fact=False):
                 return {"text": "The supplied synthetic excerpt reports checking time." if fact else context["claims"][data["claim_id"]]["text"],
                         "kind": "fact" if fact else "position", "evidence_ids": eids,
@@ -71,6 +71,20 @@ class FixtureEngine:
                                    for role in ("introduction", "related_work", "position", "counterarguments",
                                                 "implications", "limitations", "conclusion")],
                       "uncertainties": notes}
+            if kind == "revise_draft":
+                result["sections"][1]["blocks"][0]["qualification"] += " The population scope is limited to the inspected synthetic passage."
+        elif kind == "verify":
+            from loop_research.roles import blocks
+            facts, coverage = [], []
+            for block in blocks(data["draft"]["content"]):
+                factual = block["kind"] == "fact"
+                coverage.append({"block_id": block["id"], "status": "complete" if factual else "no_facts", "reason": "Explicit synthetic fixture coverage"})
+                if factual:
+                    eid = next(iter(data["source_spans"]))
+                    facts.append({"id": "F001", "block_id": block["id"], "field": "text", "text": block["text"], "occurrence": 1,
+                                  "sources": [{"evidence_id": eid, "quote": data["source_spans"][eid]["quote"], "occurrence": 1}],
+                                  "verdict": "supported", "reason": "Synthetic passage only", "qualification": "Synthetic evidence is not a real scientific result."})
+            result = {"facts": facts, "coverage": coverage, "limitations": notes}
         elif kind == "review":
             self.reviews += 1
             findings = []

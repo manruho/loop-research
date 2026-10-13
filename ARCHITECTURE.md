@@ -4,7 +4,7 @@
 
 The outer harness owns durable research state and accepts or rejects results. Codex performs one bounded role per invocation, using ChatGPT authentication, isolated context and a structured output contract. It does not independently mark evidence as human verified or finalize the study.
 
-The normal path is orientation, search, acquisition, reading, exploration, comparison, outline, draft and review. Review and comparison can request targeted research. Redesign can revise, fork, merge, research, hold or withdraw. There is no requirement to produce a paper.
+The normal path is orientation, search, acquisition, reading, exploration, comparison, outline, draft, fact verification and review. Review and comparison can request targeted research. Redesign can revise, fork, merge, research, hold or withdraw. There is no requirement to produce a paper.
 
 ## Implemented requirements and evidence
 
@@ -31,3 +31,13 @@ An artifact is current only when its input basis still matches the research stat
 PDFs use Poppler reading order, with physical page boundaries retained and whitespace normalized. Text extraction can still be wrong. A new extractor snapshot does not rewrite old quotations. Reading is limited to selected pages; the exact inspected scope must accompany novelty and factual assertions.
 
 `ready_for_human` is a request for review. `finalized` records a human decision after the host checks current artifacts and cited evidence. Neither is a journal acceptance or proof of correctness. GUI, OCR, figure interpretation and additional discovery providers are later extensions of this CLI state model.
+
+## Quality upgrade (schema 7)
+
+OpenAlex provides keyword discovery and bounded incoming/outgoing citation observations. `discovery.py` records the provider response and graph edges; it does not equate citations with substantive support. DOI/OpenAlex aliases do not rewrite immutable document versions. The acquisition limit applies to cumulative attempted papers, not a changing top-N list. Deterministic execution follows the already-generated search plan and host ranking for source operations; model decisions remain for other competing research actions.
+
+`verification.py` extracts fact-level spans from every block, including mixed and normative blocks, and assesses sources using a separately selected Codex model. Exact manuscript/source offsets are resolved by the host. A verification artifact (U ID) and its fact/source rows are stored atomically. Unsupported facts and incomplete extraction create blocking issues even if a reviewer overlooks them. Review receives the manuscript and evidence, not the writer's private reasoning.
+
+Prompt contracts, their versions, model configuration and result provenance are saved. CLI-confirmed models are checked against requested models; absent confirmation remains unconfirmed. Different requested models at the same provider do not guarantee independent errors. Legacy completion judgments are retained in the audit trail but require the new verification/review process before reconfirmation.
+
+`evaluation.py` provides a paired three-case pilot, retained failures, bounded runtime, anonymized human score sheets, validated score imports and reports. Automatic identifier matches and native support judgments are not human quality scores. See QUALITY.md and EVALUATION.md for operation and remaining limits.

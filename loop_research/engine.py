@@ -30,7 +30,7 @@ def diagnostic(stderr):
                 if re.search(r"error|failed|invalid|unsupported|reconnect|rate.?limit|stream disconnected", line, re.IGNORECASE)]
     text = "\n".join(selected[-3:])[-1200:]
     text = re.sub(r"(sk-[A-Za-z0-9_-]+|Bearer\s+\S+|eyJ[A-Za-z0-9._-]{30,})", "[redacted]", text, flags=re.IGNORECASE)
-    for key in ("OPENAI_API_KEY", "CODEX_API_KEY", "CODEX_ACCESS_TOKEN"):
+    for key in ("OPENAI_API_KEY", "CODEX_API_KEY", "CODEX_ACCESS_TOKEN", "OPENALEX_API_KEY"):
         value = os.environ.get(key)
         if value:
             text = text.replace(value, "[redacted]")
@@ -139,9 +139,14 @@ class CodexEngine:
                 validate(raw, schema)
                 execution = {
                     "cli_version": auth.get("version"), "requested_model": self.model,
+                    "resolved_model": next((e.get("model") for e in events if isinstance(e.get("model"), str)), None),
+                    "model_confirmation": "CLI-reported" if any(isinstance(e.get("model"), str) for e in events) else "unconfirmed",
+                    "independence_scope": "different requested model, same provider; shared errors remain possible",
                     "thread_id": next((e.get("thread_id") for e in events if e.get("type") == "thread.started"), None),
                     "usage": next((e.get("usage") for e in reversed(events) if e.get("type") == "turn.completed"), None),
                 }
+                if execution["resolved_model"] and self.model and execution["resolved_model"] != self.model:
+                    raise EngineFailure("CLIが指定と異なるモデルを報告しました。", raw_result=raw)
                 return raw, execution
         except KeyboardInterrupt:
             if process is not None:

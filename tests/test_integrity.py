@@ -7,6 +7,7 @@ from unittest.mock import patch
 
 from loop_research.common import ResearchError
 from loop_research.literature import arxiv_expression, parse_arxiv, parse_crossref
+from loop_research.quality_store import QUALITY_SCHEMA
 from loop_research.store import ResearchStore, SCHEMA, RUN_SCHEMA
 from loop_research.literature_store import LITERATURE_SCHEMA
 from loop_research.workflow_store import WORKFLOW_SCHEMA, OWNER_SCHEMA, DEFAULT_SETTINGS
@@ -18,10 +19,10 @@ from tests.fixtures import FixtureEngine
 class IntegrityAcceptance(unittest.TestCase):
     def test_all_supported_old_schemas_keep_claims_and_evidence(self):
         with tempfile.TemporaryDirectory() as directory:
-            for version in (1, 2, 3, 4, 5):
+            for version in (1, 2, 3, 4, 5, 6):
                 with self.subTest(version=version):
                     path = Path(directory) / f"v{version}.sqlite3"
-                    schema = SCHEMA.replace("PRAGMA user_version = 6;", f"PRAGMA user_version = {version};")
+                    schema = SCHEMA.replace(QUALITY_SCHEMA, "").replace("PRAGMA user_version = 7;", f"PRAGMA user_version = {version};")
                     if version < 5:
                         schema = schema.replace(OWNER_SCHEMA, "")
                     if version < 4:
@@ -49,7 +50,7 @@ class IntegrityAcceptance(unittest.TestCase):
                     db.commit()
                     db.close()
                     store = ResearchStore(path)
-                    self.assertEqual(store.db.execute("PRAGMA user_version").fetchone()[0], 6)
+                    self.assertEqual(store.db.execute("PRAGMA user_version").fetchone()[0], 7)
                     self.assertEqual(store.claim_row("C001")["text"], "Old claim")
                     self.assertEqual(store.evidence_row("E001")["quote"], "old quote")
                     self.assertEqual(store.evidence_row("E001")["status"], "checked")
@@ -67,6 +68,7 @@ class IntegrityAcceptance(unittest.TestCase):
                          'all:"self-correction" AND all:"large language models"')
         self.assertEqual(arxiv_expression('ti:"AI Scientist" OR abs:uncertainty'),
                          'ti:"AI Scientist" OR abs:"uncertainty"')
+        self.assertEqual(arxiv_expression('((foo OR bar) AND baz)'), '( ( all:"foo" OR all:"bar" ) AND all:"baz" )')
         with self.assertRaises(ResearchError):
             arxiv_expression('"Unclosed query')
 

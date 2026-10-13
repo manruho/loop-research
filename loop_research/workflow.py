@@ -8,8 +8,9 @@ import re
 import signal
 import sqlite3
 import sys
+import time
 
-from . import roles
+from . import roles, verification
 from .common import ResearchError, identifier, label, now
 from .engine import CodexEngine, EngineFailure, process_alive
 from .literature import fetch_paper, search_papers
@@ -19,8 +20,8 @@ from .workflow_store import digest, encoded
 
 SCHEMAS = {
     "orientation": roles.ORIENTATION, "reading": roles.READING, "exploration": roles.EXPLORATION,
-    "comparison": roles.COMPARISON, "outline": roles.OUTLINE, "draft": roles.DRAFT,
-    "review": roles.REVIEW, "redesign": roles.REDESIGN, "decision": roles.DECISION,
+    "comparison": roles.COMPARISON, "outline": roles.OUTLINE, "draft": roles.DRAFT, "revise_draft": roles.DRAFT,
+    "review": roles.REVIEW, "verify": verification.VERIFY, "redesign": roles.REDESIGN, "decision": roles.DECISION,
 }
 HANDLERS = {kind: "apply_" + kind for kind in SCHEMAS}
 HANDLERS["exploration"] = "apply_exploration"
@@ -60,8 +61,44 @@ class ResearchWorkflow:
     def __init__(self, store, engine=None):
         self.store = store
         state = store.study_state()
+        self.deadline = None
+        self.injected_engine = engine is not None
         self.engine = engine or CodexEngine(state["settings"]["model"], state["settings"]["timeout"],
                                            state["settings"]["reasoning_effort"])
+
+
+    def engine_for(self, kind):
+        if self.injected_engine:
+            return self.engine
+        settings = self.store.study_state()["settings"]
+        if not settings["model"] or not settings["review_model"]:
+            raise ResearchError("--model と --review-model を明示してください。再開時は保存済み設定を使います。")
+        if settings["model"] == settings["review_model"]:
+            raise ResearchError("執筆と査読には異なるモデルが必要です。")
+        reviewer = kind in ("review", "verify")
+        timeout = settings["timeout"]
+        if self.deadline is not None:
+            timeout = min(timeout, self.deadline - time.monotonic())
+            if timeout <= 0:
+                raise ResearchError("今回の実行時間上限に達しました。")
+        return CodexEngine(settings["review_model"] if reviewer else settings["model"], timeout,
+                           settings["review_effort"] if reviewer else settings["reasoning_effort"])
+
+    def current_verification(self):
+        draft = self.current_artifact("draft")
+        if not draft:
+            return None
+        artifact = self.current_artifact("verify")
+        if not artifact or artifact["input"]["draft"]["id"] != draft["id"]:
+            return None
+        if artifact["input"].get("contract_version") != roles.PROMPT_VERSIONS["verify"]:
+            return None
+        settings = self.store.study_state()["settings"]
+        expected = self.engine.config if self.injected_engine else {"model": settings["review_model"], "reasoning_effort": settings["review_effort"]}
+        task = self.store.show_task(artifact["task_id"]) if artifact["task_id"] else None
+        if not task or any(task["config"].get(k) != expected.get(k) for k in ("model", "reasoning_effort")):
+            return None
+        return artifact
 
     def human_guidance(self):
         relevant = {"study.configured", "study.claim_selected", "study.controlled", "issue.responded",
@@ -109,7 +146,7 @@ class ResearchWorkflow:
                              "page": data["page"], "start": data.get("start", 0),
                              "characters": len(data["page_text"]), "relevance": artifact["content"]["relevance"],
                              "research_question": data["question"]})
-        return {"searches": self.store.list_searches(), "readings": readings,
+        return {"searches": self.store.list_searches(), "readings": readings, "citation_graph": self.store.citation_graph(),
                 "notice": "限定的な検索・指定箇所のAI読解。全文精読・新規性の証明・人間の確認ではない。"}
 
     def context(self, only_claim=None, for_comparison=False):
@@ -191,7 +228,16 @@ class ResearchWorkflow:
             return None
         for entry in reversed(self.store.list_artifacts("review")):
             if entry["claim_id"] == cid and entry["claim_revision"] == self.store.claim_row(cid)["revision"]:
-                return self.store.show_artifact(entry["id"])
+                artifact = self.store.show_artifact(entry["id"])
+                if artifact["input"].get("contract_version") != roles.PROMPT_VERSIONS["review"]:
+                    continue
+                settings = state["settings"]
+                config = self.engine.config if self.injected_engine else {"model": settings["review_model"], "reasoning_effort": settings["review_effort"]}
+                task = self.store.show_task(artifact["task_id"]) if artifact["task_id"] else None
+                if task and all(task["config"].get(k) == config.get(k) for k in ("model", "reasoning_effort")):
+                    verified = self.current_verification()
+                    if verified and artifact["input"].get("verification", {}).get("id") == verified["id"]:
+                        return artifact
         return None
 
     def data_for(self, kind, document=None, page=None, choices=None):
@@ -199,6 +245,7 @@ class ResearchWorkflow:
         if kind == "orientation":
             return {"question": state["question"], "audience": state["audience"], "venue": state["venue"],
                     "preferred_provider": state["settings"]["provider"], "query_limit": state["settings"]["query_limit"],
+                    "available_providers": ["arxiv", "crossref", "openalex"],
                     "human_guidance": self.human_guidance(),
                     "existing_positions": self.candidates()}
         if kind == "reading":
@@ -229,18 +276,55 @@ class ResearchWorkflow:
         common = {"claim_id": cid, "basis": self.basis(cid), "context": context}
         if kind == "outline":
             return common
-        if kind == "draft":
+        if kind in ("draft", "revise_draft"):
             outline = self.current_artifact("outline")
             if not outline:
                 raise ResearchError("現行状態に対応する論証を先に作成してください。")
             common["outline"] = {"id": outline["id"], "content": outline["content"]}
+            if kind == "revise_draft":
+                draft, review = self.current_artifact("draft"), self.latest_relevant_review()
+                if not draft or not review:
+                    raise ResearchError("草稿の修正には現行草稿の検証と査読が必要です。")
+                common["previous_draft"] = {"id": draft["id"], "content": draft["content"]}
+                common["review"] = {"id": review["id"], "content": review["content"]}
+                common["verification"] = self.current_verification()["content"]
             return common
-        if kind == "review":
+        if kind in ("review", "verify"):
             draft = self.current_artifact("draft")
             if not draft:
                 raise ResearchError("現行状態に対応する草稿を先に作成してください。")
+            if not self.injected_engine and draft["task_id"]:
+                writer = self.store.show_task(draft["task_id"])
+                if writer["config"].get("model") == state["settings"]["review_model"]:
+                    raise ResearchError("現行草稿の執筆モデルと査読モデルが同じです。別の査読モデルを指定してください。")
             common["draft"] = {"id": draft["id"], "content": draft["content"]}
-            common["prior_issues"] = self.store.list_issues()
+            common["contract_version"] = roles.PROMPT_VERSIONS[kind]
+            if kind == "verify":
+                spans = {}
+                for eid, evidence in context["evidence"].items():
+                    source = evidence.get("document_source")
+                    if not source:
+                        continue
+                    stored = self.store.evidence_row(eid)
+                    doc = self.store.document_row(source["document_id"])
+                    start, end = verification.locate(self.store.document_page(source["document_id"], source["page"]), stored["quote"])
+                    spans[eid] = {"document_id": source["document_id"], "page": source["page"], "start": start, "end": end,
+                                  "quote": stored["quote"], "sha256": doc["sha256"], "source_version": doc["source_version"],
+                                  "level": stored["level"], "human_status": stored["status"], "extractor": doc["extractor"],
+                                  "linkage": "host-validated evidence_documents mapping and exact page substring",
+                                  "source_url": doc["source_url"] if doc["source_url"].startswith(("https://", "http://")) else "local immutable document snapshot"}
+                common["source_spans"] = spans
+                # Verification needs actual manuscript and source spans, not repeated abstracts/quotes.
+                common["context"] = {"question": context["question"], "claims": context["claims"],
+                                     "scope": context["scope"], "human_guidance": context["human_guidance"],
+                                     "evidence": {eid: {"claim_id": item["claim_id"], "level": item["level"], "status": item["status"]}
+                                                  for eid, item in context["evidence"].items()}}
+            else:
+                verified = self.current_verification()
+                if not verified:
+                    raise ResearchError("現行草稿の事実主張検証を先に行ってください。")
+                common["verification"] = {"id": verified["id"], "content": verified["content"]}
+                common["prior_issues"] = self.store.list_issues()
             return common
         if kind == "redesign":
             review = self.latest_relevant_review()
@@ -264,8 +348,10 @@ class ResearchWorkflow:
         except Exception:
             self.store.db.rollback()
             raise
-        key = digest({"kind": kind, "data": data, "prompt_version": 1, "model": self.engine.config.get("model"),
-                      "reasoning_effort": self.engine.config.get("reasoning_effort")})
+        config = self.engine_for(kind).config
+        key = digest({"kind": kind, "data": data, "prompt": roles.PROMPTS[kind], "schema": SCHEMAS[kind],
+                      "prompt_version": roles.PROMPT_VERSIONS[kind], "model": config.get("model"),
+                      "reasoning_effort": config.get("reasoning_effort")})
         return data, key, fingerprint
 
     def perform(self, kind, force=False, **parameters):
@@ -276,19 +362,34 @@ class ResearchWorkflow:
             row = self.store.db.execute("SELECT id FROM tasks WHERE kind=? AND semantic_key=? AND status='completed' ORDER BY id DESC LIMIT 1", (kind, key)).fetchone()
             if row:
                 return self.store.show_task(label(row[0], "T"))
+        engine = self.engine_for(kind)
         task = self.store.start_task(kind, key, data, roles.PROMPTS[kind], SCHEMAS[kind],
-                                     self.engine.config, fingerprint)
+                                     dict(engine.config, prompt_version=roles.PROMPT_VERSIONS[kind]), fingerprint)
         task_id = task["id"]
         print(f"{task_id}: {kind}を実行しています…", file=sys.stderr, flush=True)
         raw = None
         execution = None
         try:
-            raw, execution = self.engine.execute(
+            raw, execution = engine.execute(
                 kind, data, roles.PROMPTS[kind], SCHEMAS[kind],
                 on_spawn=lambda pid, identity: self.store.task_process(task_id, pid, identity),
             )
             validate(raw, SCHEMAS[kind])
-            roles.validate_semantics(kind, data, raw)
+            if kind == "verify":
+                raw = verification.normalize(data, raw)
+            else:
+                if kind == "review":
+                    for item in verification.blocking(data["verification"]["content"]):
+                        target_type = "fact" if "verdict" in item else "block"
+                        target = item["id"] if target_type == "fact" else item["block_id"]
+                        if not any(f["severity"] in ("major", "critical") and ((f["target_type"] == target_type and f["target_id"] == target) or (f["target_type"] == "block" and f["target_id"] == item["block_id"])) for f in raw["findings"]):
+                            raw["findings"].append({"severity": "major", "category": "citation", "target_type": target_type, "target_id": target,
+                                                   "explanation": "Host fact gate: " + item.get("verdict", item.get("status", "")) + ": " + item["reason"],
+                                                   "evidence_ids": [], "suggested_action": "revise", "remaining_uncertainty": item.get("qualification") or item["reason"]})
+                    if verification.blocking(data["verification"]["content"]) and raw["decision"] == "ready_for_human":
+                        raw["decision"] = "revise"
+                    validate(raw, SCHEMAS[kind])
+                roles.validate_semantics(kind, data, raw)
             result = self.store.finish_task(task_id, "completed", result=raw, execution=execution,
                                             apply=getattr(self.store, HANDLERS[kind]))
             if result["status"] == "stale":
@@ -311,6 +412,8 @@ class ResearchWorkflow:
         for item in reversed(self.store.list_artifacts("orientation")):
             artifact = self.store.show_artifact(item["id"])
             data = artifact["input"]
+            if artifact["task_id"] and self.store.show_task(artifact["task_id"])["config"].get("prompt_version") != roles.PROMPT_VERSIONS["orientation"]:
+                continue
             if all(data.get(key) == state[key] for key in ("question", "audience", "venue")) \
                     and data.get("preferred_provider") == state["settings"]["provider"]:
                 return artifact
@@ -371,11 +474,13 @@ class ResearchWorkflow:
             if raw["provider"] == "manual":
                 score += 5
             discoveries = self.store.show_paper(item["id"])["discoveries"]
+            if any(entry["query"].startswith("graph:") for entry in discoveries):
+                score += 6
             if any((entry["provider"], entry["query"]) in targeted for entry in discoveries):
                 score += 100
             scores.append((score, identifier(item["id"], "P"), item))
         ranked = [item for _, _, item in sorted(scores, key=lambda row: (-row[0], row[1]))]
-        if targeted:
+        if targeted or any(d["query"].startswith("graph:") for item in ranked for d in self.store.show_paper(item["id"])["discoveries"]):
             return ranked
         # Avoid spending the entire acquisition budget on one adjacent field.
         # Represent distinct successful query paths before filling by lexical relevance.
@@ -457,7 +562,9 @@ class ResearchWorkflow:
         for query in pending:
             add("search", query["purpose"], query=query["query"], provider=query["provider"])
         settings = state["settings"]
+        attempted_papers = {label(row[0], "P") for row in self.store.db.execute("SELECT DISTINCT paper_id FROM fetches")}
         papers = self.ranked_papers()[:settings["paper_limit"]]
+        papers += [p for p in self.store.list_papers() if p["id"] in attempted_papers and p["id"] not in {r["id"] for r in papers}]
         for item in papers:
             paper = self.store.show_paper(item["id"])
             documents = [doc for doc in paper["documents"] if doc["status"] == "extracted"]
@@ -468,7 +575,7 @@ class ResearchWorkflow:
             documents = list(snapshots.values())
             attempts = paper["fetches"]
             if not documents:
-                if not attempts:
+                if not attempts and len(attempted_papers) < settings["paper_limit"]:
                     add("fetch", "取得できる本文を確認し、未取得の資料を読んだことにしない", paper=item["id"], abstract=False)
                 elif paper["abstract"] and not any(doc["origin"] == "abstract" for doc in paper["documents"]):
                     add("fetch", "本文の取得失敗を残したまま、抄録だけを別の範囲として確認", paper=item["id"], abstract=True)
@@ -478,6 +585,16 @@ class ResearchWorkflow:
                 for page in wanted:
                     if page not in seen:
                         add("reading", "取得資料の関連箇所を読み、原文・解釈・未確認事項を分けて記録", document=doc["id"], page=page)
+        if not pending:
+            attempted = {(row["provider"], row["query"]) for row in self.store.list_searches()}
+            graph_new = self.store.db.execute("SELECT COUNT(DISTINCT paper_id) FROM search_results WHERE search_id IN (SELECT id FROM searches WHERE query LIKE 'graph:%') AND paper_id NOT IN (SELECT paper_id FROM search_results WHERE search_id IN (SELECT id FROM searches WHERE query NOT LIKE 'graph:%'))").fetchone()[0]
+            seeds = [p for p in self.store.list_papers() if any(not d["query"].startswith("graph:") for d in self.store.show_paper(p["id"])["discoveries"])]
+            for seed in seeds[:settings["citation_seeds"]]:
+                for direction in ("references", "citations"):
+                    signature = ("openalex", "graph:" + seed["id"] + ":" + direction)
+                    if signature not in attempted and graph_new < settings["citation_budget"]:
+                        add("related", "重要な先行研究の引用・被引用関係を限定的に追跡する", paper=seed["id"], direction=direction,
+                            limit=settings["citation_limit"], remaining=settings["citation_budget"] - graph_new)
         selected = state["selected_claim_id"]
         if selected:
             claim = self.store.claim_row(selected)
@@ -505,7 +622,10 @@ class ResearchWorkflow:
                 unlinked = self.unlinked_evidence(selected)
                 if unlinked:
                     add("ground", "新たな原文を主張へ暫定的に結び付け、査読に基づく再設計へ渡す", claim=selected)
-                add("redesign", "重大な査読指摘へ応答し、再調査・主張の限定・撤回を選ぶ")
+                if blocking and all(issue["content"]["category"] == "citation" for issue in blocking) and review["content"]["decision"] == "revise" and self.current_artifact("outline"):
+                    add("revise_draft", "引用・事実の問題を草稿で修正し、中心主張は保持して再検証する")
+                else:
+                    add("redesign", "重大な査読指摘へ応答し、再調査・主張の限定・撤回を選ぶ")
                 return result
         if result:
             return result
@@ -534,6 +654,8 @@ class ResearchWorkflow:
             add("outline", "現行の主張・根拠・限定条件から論証を設計する")
         elif not self.current_artifact("draft"):
             add("draft", "根拠と主張に結び付いた英語の草稿を作る")
+        elif not self.current_verification():
+            add("verify", "個々の事実主張と原資料の範囲を対応づけ、支持を暫定検証する")
         else:
             draft = self.current_artifact("draft")
             if not review or review["input"]["draft"]["id"] != draft["id"] or review["input"].get("basis") != self.basis(selected):
@@ -564,6 +686,9 @@ class ResearchWorkflow:
         if kind == "search":
             return search_papers(self.store, parameters["query"], parameters["provider"],
                                  self.store.study_state()["settings"]["paper_limit"])
+        if kind == "related":
+            from .discovery import related_papers
+            return related_papers(self.store, parameters["paper"], parameters["direction"], parameters["limit"], parameters["remaining"])
         if kind == "fetch":
             return fetch_paper(self.store, parameters["paper"], abstract=parameters["abstract"])
         if kind == "ground":
@@ -624,7 +749,12 @@ class ResearchWorkflow:
                 current_draft = self.current_artifact("draft")
             except ResearchError:
                 pass
+        verified = self.current_verification() if current_draft else None
+        from collections import Counter
         return {
+            "current_verification": verified["id"] if verified else None,
+            "fact_verdicts": dict(Counter(f["verdict"] for f in verified["content"]["facts"])) if verified else None,
+            "reviewer_independence": "different explicitly requested model; same provider, actual model may be unconfirmed",
             "state": state, "candidates": list(self.candidates().values()),
             "tasks": self.store.list_tasks(), "artifacts": self.store.list_artifacts(),
             "issues": self.store.list_issues(), "scope": self.scope(),
@@ -633,12 +763,17 @@ class ResearchWorkflow:
             "notice": "草稿の完成、内部査読の完了、学術的な裏付け、人間の最終判断は別の状態です。",
         }
 
-    def run(self, steps=20, resume_reason=None):
+    def run(self, steps=20, resume_reason=None, max_seconds=None):
+        self.deadline = time.monotonic() + max_seconds if max_seconds is not None else None
         if type(steps) is not int or not 1 <= steps <= 1000:
             raise ResearchError("作業上限は1〜1000で指定してください。")
         with study_lock(self.store), termination_as_interrupt():
             self.recover()
             state = self.store.study_state()
+            self.engine_for("orientation")
+            if state["status"] in ("ready_for_human", "finalized") and not self.current_verification():
+                self.store.control_study("needs_human", "旧版の確定判断は履歴に保持。事実検証と別モデル査読を再実行してください。")
+                state = self.store.study_state()
             if state["status"] != "active":
                 if not resume_reason:
                     return self.summary()
@@ -655,6 +790,9 @@ class ResearchWorkflow:
             unchanged = 0
             try:
                 for step in range(steps):
+                    if self.deadline is not None and time.monotonic() >= self.deadline:
+                        self.store.control_study("budget_exhausted", "今回の実行時間上限に達しました。")
+                        break
                     if self.store.study_state()["status"] != "active":
                         break
                     choices = self.choices()
@@ -663,6 +801,11 @@ class ResearchWorkflow:
                         break
                     if len(choices) == 1:
                         choice = choices[0]
+                    elif all(item["kind"] in ("search", "related", "fetch", "reading") for item in choices):
+                        # The orientation/search plan and host ranking already determine these operations.
+                        # Execute discovery before acquisition; don't spend an extra model call per source.
+                        order = {"search": 0, "related": 1, "fetch": 2, "reading": 3}
+                        choice = min(choices, key=lambda item: order[item["kind"]])
                     else:
                         decision = self.perform("decision", choices=choices)
                         choice = next(item for item in choices if item["choice_id"] == decision["result"]["choice_id"])
@@ -672,7 +815,7 @@ class ResearchWorkflow:
                     try:
                         self.execute_choice(choice)
                     except ResearchError as exc:
-                        if choice["kind"] not in ("search", "fetch"):
+                        if choice["kind"] not in ("search", "fetch", "related"):
                             raise
                         print(f"{choice['kind']}の失敗を保存: {exc}", file=sys.stderr, flush=True)
                     after = self.store.domain_fingerprint()
@@ -687,6 +830,8 @@ class ResearchWorkflow:
                 state = self.store.study_state()
                 if state["status"] == "active":
                     status = "interrupted" if isinstance(exc, KeyboardInterrupt) or getattr(exc, "status", None) == "interrupted" else "needs_human"
+                    if self.deadline is not None and time.monotonic() >= self.deadline and not isinstance(exc, KeyboardInterrupt):
+                        status = "budget_exhausted"
                     self.store.control_study(status, str(exc) or "人間が研究を中断")
             except (ResearchError, OSError, sqlite3.Error) as exc:
                 if self.store.study_state()["status"] == "active":
@@ -699,6 +844,9 @@ class ResearchWorkflow:
         draft = self.current_artifact("draft")
         if not draft:
             raise ResearchError("現行の主張・根拠に対応する草稿がありません。")
+        verified = self.current_verification()
+        if not verified or verification.blocking(verified["content"]):
+            raise ResearchError("現行草稿の検証に未支持の事実主張または未完了の抽出が残っています。")
         review = self.latest_relevant_review()
         if not review or review["input"]["draft"]["id"] != draft["id"]:
             raise ResearchError("現行草稿の内部査読がありません。")
