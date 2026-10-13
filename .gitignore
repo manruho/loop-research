@@ -1,0 +1,21 @@
+# Local planning documents and development dashboard
+/index.html
+/progress.js
+/仕様書.md
+/ROADMAP.md
+
+# Local configuration and credentials
+.env
+.env.*
+!.env.example
+
+# Python development artifacts
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+.ruff_cache/
+
+# Editor and operating system files
+.DS_Store
+*~
