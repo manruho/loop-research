@@ -101,7 +101,7 @@ class ResearchWorkflow:
         return artifact
 
     def human_guidance(self):
-        relevant = {"study.configured", "study.claim_selected", "study.controlled", "issue.responded",
+        relevant = {"study.configured", "study.claim_selected", "issue.responded",
                     "claim.revised", "claim.decided", "study.guidance"}
         result = []
         for event in self.store.history():
@@ -148,6 +148,20 @@ class ResearchWorkflow:
                              "research_question": data["question"]})
         return {"searches": self.store.list_searches(), "readings": readings, "citation_graph": self.store.citation_graph(),
                 "notice": "限定的な検索・指定箇所のAI読解。全文精読・新規性の証明・人間の確認ではない。"}
+
+    def prompt_scope(self):
+        """Keep search boundaries without repeating raw provider responses in prompts."""
+        scope = self.scope()
+        return {
+            "searches": [{key: search.get(key) for key in
+                          ("id", "provider", "query", "status", "error")}
+                         for search in scope["searches"]],
+            "readings": scope["readings"],
+            "citation_graph": scope["citation_graph"],
+            "limits": self.store.study_state()["settings"],
+            "notice": scope["notice"],
+            "omitted_from_prompt": "Raw search responses remain in the study database and export.",
+        }
 
     def context(self, only_claim=None, for_comparison=False):
         state = self.store.study_state()
@@ -196,7 +210,7 @@ class ResearchWorkflow:
             }
         return {"question": state["question"], "audience": state["audience"], "venue": state["venue"],
                 "claims": claims, "evidence": evidence, "excerpts": excerpts, "papers": papers,
-                "scope": self.scope(), "human_guidance": self.human_guidance()}
+                "scope": self.prompt_scope(), "human_guidance": self.human_guidance()}
 
     def selected(self):
         state = self.store.study_state()
@@ -288,6 +302,14 @@ class ResearchWorkflow:
                 common["previous_draft"] = {"id": draft["id"], "content": draft["content"]}
                 common["review"] = {"id": review["id"], "content": review["content"]}
                 common["verification"] = self.current_verification()["content"]
+                for task in reversed(self.store.list_tasks()):
+                    if task["kind"] != "revise_draft" or task["status"] != "failed":
+                        continue
+                    previous = self.store.show_task(task["id"])
+                    prior_input = previous["input"]["data"]
+                    if prior_input.get("basis") == common["basis"] and prior_input.get("previous_draft", {}).get("id") == draft["id"]:
+                        common["validation_feedback"] = {"task_id": task["id"], "error": previous["error"]}
+                        break
             return common
         if kind in ("review", "verify"):
             draft = self.current_artifact("draft")
@@ -525,7 +547,9 @@ class ResearchWorkflow:
             if failures and fallback not in done and fallback not in seen:
                 result.append(dict(query, provider=alternative, purpose="検索先の障害・制限に対する別の探索範囲"))
                 seen.add(fallback)
-        return result
+        attempted = sum(not row["query"].startswith("graph:") for row in self.store.list_searches())
+        remaining = max(0, self.store.study_state()["settings"]["search_budget"] - attempted)
+        return result[:remaining]
 
     def unlinked_evidence(self, claim):
         state = self.store.study_state()
@@ -577,7 +601,7 @@ class ResearchWorkflow:
             if not documents:
                 if not attempts and len(attempted_papers) < settings["paper_limit"]:
                     add("fetch", "取得できる本文を確認し、未取得の資料を読んだことにしない", paper=item["id"], abstract=False)
-                elif paper["abstract"] and not any(doc["origin"] == "abstract" for doc in paper["documents"]):
+                elif attempts and paper["abstract"] and not any(doc["origin"] == "abstract" for doc in paper["documents"]):
                     add("fetch", "本文の取得失敗を残したまま、抄録だけを別の範囲として確認", paper=item["id"], abstract=True)
             for doc in documents:
                 seen = self.read_pages(doc["id"])
@@ -764,6 +788,8 @@ class ResearchWorkflow:
         }
 
     def run(self, steps=20, resume_reason=None, max_seconds=None):
+        if max_seconds is not None and (not isinstance(max_seconds, (int, float)) or isinstance(max_seconds, bool) or not 0 < max_seconds < float("inf")):
+            raise ResearchError("実行時間上限は有限の正数で指定してください。")
         self.deadline = time.monotonic() + max_seconds if max_seconds is not None else None
         if type(steps) is not int or not 1 <= steps <= 1000:
             raise ResearchError("作業上限は1〜1000で指定してください。")

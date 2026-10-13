@@ -107,7 +107,10 @@ def normalize(data, result):
         if item["status"] == "no_facts" and found:
             raise ResearchError("事実なしという範囲判定と抽出結果が矛盾しています。")
         if manuscript[item["block_id"]]["kind"] == "fact" and not found and item["status"] != "incomplete":
-            raise ResearchError("事実段落の主張が抽出されていません。")
+            item["model_status"] = item["status"]
+            item["status"] = "incomplete"
+            item["host_adjustments"] = ["fact-labeled block has no extracted assertions"]
+            item["reason"] = "Host coverage gate: fact-labeled block has no extracted assertions. " + item["reason"]
     return result
 
 

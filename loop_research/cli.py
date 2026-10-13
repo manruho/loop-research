@@ -15,6 +15,7 @@ from .export import export_study
 
 def study_options(command, steps=False):
     if steps:
+        command.add_argument("--seconds", type=float, help="今回の実行時間上限（秒）。未完了の作業は保存して再開可能")
         command.add_argument("--steps", type=int, default=20, help="今回の作業上限。到達は研究完成を意味しない")
     command.add_argument("--model")
     command.add_argument("--review-model")
@@ -27,12 +28,13 @@ def study_options(command, steps=False):
     command.add_argument("--provider", choices=["arxiv", "crossref", "openalex"])
     command.add_argument("--paper-limit", type=int)
     command.add_argument("--pages", type=int, dest="pages_per_document")
+    command.add_argument("--search-budget", type=int, help="追加・代替検索を含む通算検索上限（引用追跡は別予算）")
     command.add_argument("--queries", type=int, dest="query_limit")
 
 
 def configure_options(store, args):
     settings = {key: getattr(args, key) for key in (
-        "model", "review_model", "review_effort", "citation_seeds", "citation_limit", "citation_budget", "timeout", "reasoning_effort", "provider", "paper_limit", "pages_per_document", "query_limit"
+        "model", "review_model", "review_effort", "citation_seeds", "citation_limit", "citation_budget", "timeout", "reasoning_effort", "provider", "paper_limit", "pages_per_document", "query_limit", "search_budget"
     ) if getattr(args, key, None) is not None}
     if settings:
         store.configure_study(getattr(args, "reason", None) or "CLI実行時の設定", settings=settings)
@@ -260,7 +262,7 @@ def dispatch(store, args):
         if args.audience or args.venue:
             store.configure_study("初期研究設定", audience=args.audience, venue=args.venue)
         configure_options(store, args)
-        return ResearchWorkflow(store).run(args.steps)
+        return ResearchWorkflow(store).run(args.steps, max_seconds=args.seconds)
     if args.command == "status":
         return store.status()
     if args.command == "history":
@@ -274,7 +276,7 @@ def dispatch(store, args):
     if args.command == "study":
         if args.action == "configure":
             settings = {key: getattr(args, key) for key in (
-                "model", "review_model", "review_effort", "citation_seeds", "citation_limit", "citation_budget", "timeout", "reasoning_effort", "provider", "paper_limit", "pages_per_document", "query_limit"
+                "model", "review_model", "review_effort", "citation_seeds", "citation_limit", "citation_budget", "timeout", "reasoning_effort", "provider", "paper_limit", "pages_per_document", "query_limit", "search_budget"
             ) if getattr(args, key, None) is not None}
             return store.configure_study(args.reason, args.question, args.audience, args.venue, settings)
         if args.action == "select":
@@ -300,7 +302,7 @@ def dispatch(store, args):
         if args.action == "import-draft":
             return workflow.import_draft(args.file, args.reason)
         if args.action in ("run", "resume"):
-            return workflow.run(args.steps, getattr(args, "reason", None))
+            return workflow.run(args.steps, getattr(args, "reason", None), max_seconds=args.seconds)
         kind = {"orient": "orientation", "explore": "exploration", "compare": "comparison",
                 "read": "reading", "revise-draft": "revise_draft"}.get(args.action, args.action)
         with study_lock(store):
