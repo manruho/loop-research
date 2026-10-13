@@ -62,7 +62,11 @@ class LiteratureStore:
 
     def _insert_paper(self, data):
         existing = self.db.execute("SELECT id FROM papers WHERE canonical_key=?", (data["canonical_key"],)).fetchone()
+        if data["provider"] == "openalex" and not existing:
+            existing = self.db.execute("SELECT paper_id FROM paper_aliases WHERE provider='openalex' AND external_id=?", (data["external_id"],)).fetchone()
         if existing:
+            if data["provider"] == "openalex":
+                self.db.execute("INSERT OR IGNORE INTO paper_aliases VALUES('openalex',?,?)", (data["external_id"], existing[0]))
             return existing[0]
         result = self.db.execute(
             "INSERT INTO papers(canonical_key,provider,external_id,title,authors_json,doi,url,pdf_url,source_version,published,abstract,metadata_json,discovered_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)",
@@ -71,6 +75,8 @@ class LiteratureStore:
              data.get("pdf_url", ""), data.get("source_version", ""), data.get("published", ""),
              canonical_text(data.get("abstract", "")), json.dumps(data.get("metadata", {}), ensure_ascii=False), now()),
         )
+        if data["provider"] == "openalex":
+            self.db.execute("INSERT OR IGNORE INTO paper_aliases VALUES('openalex',?,?)", (data["external_id"], result.lastrowid))
         return result.lastrowid
 
     def add_paper(self, data):

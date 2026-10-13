@@ -31,7 +31,7 @@ RESULT_SCHEMA = {
 def subscription_environment():
     env = os.environ.copy()
     # Never silently switch this adapter to usage-based API authentication.
-    for name in ("OPENAI_API_KEY", "CODEX_API_KEY"):
+    for name in ("OPENAI_API_KEY", "CODEX_API_KEY", "OPENALEX_API_KEY"):
         env.pop(name, None)
     return env
 

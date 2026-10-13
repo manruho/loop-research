@@ -4,6 +4,7 @@ import json
 import sqlite3
 from pathlib import Path
 from .common import ResearchError, identifier, label, now, required
+from .quality_store import QUALITY_SCHEMA, QualityStore
 from .literature_store import LITERATURE_SCHEMA, LiteratureStore
 from .workflow_store import WORKFLOW_SCHEMA, OWNER_SCHEMA, WorkflowStore, DEFAULT_SETTINGS, encoded
 
@@ -45,10 +46,10 @@ CREATE TABLE events (
     action TEXT NOT NULL, claim_id INTEGER, evidence_id INTEGER,
     reason TEXT NOT NULL, payload TEXT NOT NULL
 );
-""" + RUN_SCHEMA + LITERATURE_SCHEMA + WORKFLOW_SCHEMA + OWNER_SCHEMA + "PRAGMA user_version = 6;"
+""" + RUN_SCHEMA + LITERATURE_SCHEMA + WORKFLOW_SCHEMA + OWNER_SCHEMA + QUALITY_SCHEMA + "PRAGMA user_version = 7;"
 
 
-class ResearchStore(LiteratureStore, WorkflowStore):
+class ResearchStore(LiteratureStore, WorkflowStore, QualityStore):
     def __init__(self, path, initialize=False):
         self.path = Path(path).expanduser()
         if not initialize and not self.path.is_file():
@@ -59,7 +60,7 @@ class ResearchStore(LiteratureStore, WorkflowStore):
         self.db.row_factory = sqlite3.Row
         self.db.execute("PRAGMA foreign_keys = ON")
         version = self.db.execute("PRAGMA user_version").fetchone()[0]
-        if version not in (0, 1, 2, 3, 4, 5, 6) or (not initialize and version == 0):
+        if version not in (0, 1, 2, 3, 4, 5, 6, 7) or (not initialize and version == 0):
             self.db.close()
             raise ResearchError("対応していない研究DBです。上書きせず停止しました。")
         if version in (1, 2, 3, 4, 5) and not initialize:
@@ -88,6 +89,22 @@ class ResearchStore(LiteratureStore, WorkflowStore):
                 self.db.execute("PRAGMA user_version = 6")
                 self.db.commit()
                 self.db.execute("PRAGMA foreign_keys = ON")
+            except Exception:
+                self.db.rollback()
+                self.db.close()
+                raise
+        if not initialize and self.db.execute("PRAGMA user_version").fetchone()[0] == 6:
+            try:
+                self.db.executescript("BEGIN IMMEDIATE;\n" + QUALITY_SCHEMA)
+                self.event("database.migrated", "引用関係と事実主張の検証を追加。旧版は履歴として保持。", {"from": 6, "to": 7})
+                legacy = self.db.execute("SELECT status FROM study_state WHERE id=1").fetchone()
+                if legacy and legacy[0] in ("ready_for_human", "finalized"):
+                    self._set_study("旧版の判断は履歴に保持。事実検証と別モデル査読を再実行してください。", status="needs_human", phase="verification")
+                    self.event("study.completion_invalidated", "新しい検証工程が未実施", {"previous_status": legacy[0]})
+                self.db.execute("PRAGMA user_version = 7")
+                if self.db.execute("PRAGMA foreign_key_check").fetchone():
+                    raise ResearchError("移行後の参照関係に問題があります。")
+                self.db.commit()
             except Exception:
                 self.db.rollback()
                 self.db.close()

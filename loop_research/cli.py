@@ -17,9 +17,14 @@ def study_options(command, steps=False):
     if steps:
         command.add_argument("--steps", type=int, default=20, help="今回の作業上限。到達は研究完成を意味しない")
     command.add_argument("--model")
+    command.add_argument("--review-model")
+    command.add_argument("--review-effort", choices=["low", "medium", "high", "xhigh", "max", "ultra"])
+    command.add_argument("--citation-seeds", type=int)
+    command.add_argument("--citation-limit", type=int)
+    command.add_argument("--citation-budget", type=int)
     command.add_argument("--timeout", type=float)
     command.add_argument("--effort", dest="reasoning_effort", choices=["low", "medium", "high", "xhigh", "max", "ultra"])
-    command.add_argument("--provider", choices=["arxiv", "crossref"])
+    command.add_argument("--provider", choices=["arxiv", "crossref", "openalex"])
     command.add_argument("--paper-limit", type=int)
     command.add_argument("--pages", type=int, dest="pages_per_document")
     command.add_argument("--queries", type=int, dest="query_limit")
@@ -27,7 +32,7 @@ def study_options(command, steps=False):
 
 def configure_options(store, args):
     settings = {key: getattr(args, key) for key in (
-        "model", "timeout", "reasoning_effort", "provider", "paper_limit", "pages_per_document", "query_limit"
+        "model", "review_model", "review_effort", "citation_seeds", "citation_limit", "citation_budget", "timeout", "reasoning_effort", "provider", "paper_limit", "pages_per_document", "query_limit"
     ) if getattr(args, key, None) is not None}
     if settings:
         store.configure_study(getattr(args, "reason", None) or "CLI実行時の設定", settings=settings)
@@ -49,6 +54,23 @@ def parser():
     history.add_argument("--claim")
     codex = commands.add_parser("codex", help="ChatGPT認証の確認")
     codex.add_subparsers(dest="action", required=True).add_parser("status")
+    evaluation = commands.add_parser("eval", help="公開課題での探索的比較と人間評価")
+    actions = evaluation.add_subparsers(dest="action", required=True)
+    evaluate = actions.add_parser("run")
+    evaluate.add_argument("--output", required=True)
+    evaluate.add_argument("--cases", default="benchmarks/position-papers.json")
+    evaluate.add_argument("--model", required=True)
+    evaluate.add_argument("--review-model", required=True)
+    evaluate.add_argument("--seconds", type=int, default=1800)
+    evaluate.add_argument("--resume", action="store_true")
+    packet = actions.add_parser("packet")
+    packet.add_argument("--output", required=True)
+    packet.add_argument("--review-model", required=True)
+    scores = actions.add_parser("import-scores")
+    scores.add_argument("--output", required=True)
+    scores.add_argument("--file", required=True)
+    report = actions.add_parser("report")
+    report.add_argument("--output", required=True)
     commands.add_parser("runs", help="Codex実行の一覧")
     run = commands.add_parser("run", help="実行結果と入力の確認")
     actions = run.add_subparsers(dest="action", required=True)
@@ -88,7 +110,7 @@ def parser():
     imported = actions.add_parser("import-draft", help="人間が編集した構造化草稿を新しい版として取り込む")
     imported.add_argument("--file", required=True)
     imported.add_argument("--reason", required=True)
-    for name in ("orient", "explore", "compare", "outline", "draft", "review", "redesign", "read"):
+    for name in ("orient", "explore", "compare", "outline", "draft", "verify", "review", "redesign", "read"):
         role = actions.add_parser(name, help="この工程だけを実行")
         study_options(role)
         role.add_argument("--force", action="store_true", help="同じ入力でも新しい評価を依頼")
@@ -122,12 +144,18 @@ def parser():
     actions = paper.add_subparsers(dest="action", required=True)
     search = actions.add_parser("search")
     search.add_argument("query")
-    search.add_argument("--provider", choices=["crossref", "arxiv"], default="crossref")
+    search.add_argument("--provider", choices=["crossref", "arxiv", "openalex"], default="crossref")
     search.add_argument("--limit", type=int, default=5)
     actions.add_parser("list")
+    actions.add_parser("graph")
+    related = actions.add_parser("related")
+    related.add_argument("id")
+    related.add_argument("--direction", choices=["references", "citations", "both"], default="both")
+    related.add_argument("--limit", type=int, default=10)
     show = actions.add_parser("show")
     show.add_argument("id")
     add = actions.add_parser("add", help="既知の文献を登録。書誌の自動確認はしない")
+    add.add_argument("--openalex", help="OpenAlex ID (W...)。書誌をAPIから取得")
     add.add_argument("--arxiv", help="arXiv ID。版の指定を推奨")
     add.add_argument("--title")
     add.add_argument("--url")
@@ -246,7 +274,7 @@ def dispatch(store, args):
     if args.command == "study":
         if args.action == "configure":
             settings = {key: getattr(args, key) for key in (
-                "model", "timeout", "reasoning_effort", "provider", "paper_limit", "pages_per_document", "query_limit"
+                "model", "review_model", "review_effort", "citation_seeds", "citation_limit", "citation_budget", "timeout", "reasoning_effort", "provider", "paper_limit", "pages_per_document", "query_limit"
             ) if getattr(args, key, None) is not None}
             return store.configure_study(args.reason, args.question, args.audience, args.venue, settings)
         if args.action == "select":
@@ -290,6 +318,12 @@ def dispatch(store, args):
     if args.command == "issue":
         return store.list_issues() if args.action == "list" else store.respond_issue(args.id, args.status, args.reason, args.uncertainty)
     if args.command == "paper":
+        if args.action == "graph":
+            return store.citation_graph()
+        if args.action == "related":
+            from .discovery import related_papers
+            with study_lock(store):
+                return related_papers(store, args.id, args.direction, args.limit)
         if args.action == "search":
             return search_papers(store, args.query, args.provider, args.limit)
         if args.action == "list":
@@ -297,6 +331,12 @@ def dispatch(store, args):
         if args.action == "show":
             return store.show_paper(args.id)
         if args.action == "add":
+            if args.openalex:
+                import re
+                from .discovery import request, parse_work, BASE
+                if not re.fullmatch(r"W[0-9]+", args.openalex) or any((args.arxiv, args.url, args.pdf_url, args.title, args.source_version)):
+                    raise ResearchError("--openalex はW数字の単独指定で使ってください。")
+                return store.add_paper(parse_work(request(BASE + "/" + args.openalex)))
             return register_paper(store, args.title, args.url, args.pdf_url, args.arxiv, args.source_version)
         return fetch_paper(store, args.id, args.url, args.file, args.abstract)
     if args.command == "search":
@@ -358,11 +398,27 @@ def main(argv=None):
             result = codex_status()
             print(json.dumps(result, ensure_ascii=False, indent=2))
             return 0 if result["chatgpt_authenticated"] else 1
+        if args.command == "eval":
+            from . import evaluation
+            if args.action == "run":
+                if not 1 <= args.seconds <= 7200:
+                    raise ResearchError("評価の時間上限は1〜7200秒です。")
+                result = evaluation.run_evaluation(args.output, args.cases, args.model, args.review_model, args.seconds, args.resume)
+            elif args.action == "packet":
+                result = evaluation.packet(args.output, args.review_model)
+            elif args.action == "import-scores":
+                result = evaluation.import_scores(args.output, args.file)
+            else:
+                result = evaluation.report(args.output)
+            print(json.dumps(result, ensure_ascii=False, indent=2))
+            return 0
+        if args.command == "start" and (not args.model or not args.review_model or args.model == args.review_model):
+            raise ResearchError("新規研究には異なる --model と --review-model を明示してください。")
         store = ResearchStore(args.db, initialize=args.command in ("init", "start"))
         result = dispatch(store, args)
         print(json.dumps(result, ensure_ascii=False, indent=2))
         return 0
-    except (ResearchError, sqlite3.Error, OSError) as exc:
+    except (ResearchError, sqlite3.Error, OSError, KeyError, TypeError) as exc:
         print(f"エラー: {exc}", file=sys.stderr)
         return 1
     finally:
