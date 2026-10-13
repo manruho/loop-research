@@ -82,13 +82,12 @@ class LedgerAcceptance(unittest.TestCase):
             self.assertEqual(result['ledger_claims'][0]['verdict'], verdict)
             self.assertTrue(any(f.get('ledger') for f in verification.blocking(result)))
 
-    def test_invalid_span_snapshot_nonfinite_value_and_duplicate_ids_rejected(self):
+    def test_invalid_span_snapshot_and_duplicate_ids_rejected(self):
         _, data, raw = self.case()
-        for corrupt in ('span', 'hash', 'json', 'duplicate', 'coverage'):
+        for corrupt in ('span', 'hash', 'duplicate', 'coverage'):
             d, r = copy.deepcopy(data), copy.deepcopy(raw)
             if corrupt == 'span': r['ledger_claims'][0]['text'] = 'Invented text'
             if corrupt == 'hash': d['ledger_snapshot']['records']['search_count'] += 1
-            if corrupt == 'json': r['ledger_claims'][0]['checks'][0]['expected_json'] = 'NaN'
             if corrupt == 'duplicate': r['ledger_claims'].append(copy.deepcopy(r['ledger_claims'][0]))
             if corrupt == 'coverage': r['ledger_coverage'].pop()
             with self.subTest(corrupt=corrupt), self.assertRaises(ResearchError):
@@ -102,6 +101,26 @@ class LedgerAcceptance(unittest.TestCase):
         self.assertEqual(verification.normalize(data, raw)['ledger_claims'][0]['verdict'], 'supported')
         raw['ledger_claims'][0]['checks'] = [{'path': '/search_count', 'operator': 'all_equal', 'expected_json': '1'}]
         self.assertEqual(verification.normalize(data, raw)['ledger_claims'][0]['verdict'], 'undetermined')
+
+    def test_bad_expected_value_is_undetermined_without_discarding_valid_assertions(self):
+        _, data, raw = self.case()
+        second = copy.deepcopy(raw['ledger_claims'][0])
+        second['id'] = 'G002'
+        second['checks'][0]['expected_json'] = '"P005"},{'
+        raw['ledger_claims'].append(second)
+        result = verification.normalize(data, raw)
+        self.assertEqual(result['ledger_claims'][0]['verdict'], 'supported')
+        self.assertEqual(result['ledger_claims'][1]['verdict'], 'undetermined')
+        self.assertTrue(verification.blocking(result))
+        second['checks'][0]['expected_json'] = 'NaN'
+        self.assertEqual(verification.normalize(data, raw)['ledger_claims'][1]['verdict'], 'undetermined')
+
+    def test_record_envelope_prefix_and_dictionary_membership(self):
+        _, data, raw = self.case()
+        raw['ledger_claims'][0]['checks'][0]['path'] = '/records/search_count'
+        self.assertEqual(verification.normalize(data, raw)['ledger_claims'][0]['verdict'], 'supported')
+        raw['ledger_claims'][0]['checks'] = [{'path': '/records/searches', 'operator': 'contains', 'expected_json': '"S001"'}]
+        self.assertEqual(verification.normalize(data, raw)['ledger_claims'][0]['verdict'], 'supported')
 
     def test_disputed_evidence_remains_visible_in_record_snapshot(self):
         workflow, _, _ = self.case()

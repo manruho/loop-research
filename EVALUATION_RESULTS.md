@@ -81,3 +81,28 @@ The loop now reaches drafting, review and manuscript revision in this case.
 The next methodological decision is how to verify internal ledger claims
 separately from literature-backed assertions, rather than repeating manuscript
 rewrites or weakening the factual gate.
+
+## Execution-ledger recheck (2026-10-13)
+
+The previous final manuscript A017 was rechecked in a database copy without
+rewriting it or discovering new literature. The original study was preserved.
+The accepted report contains 22 AI-supported literature assertions and 19
+execution-record assertions: 8 host-supported, 11 undetermined. A fresh review
+still requested revision and the copied study remains `needs_human`.
+
+Search count/provider and major reading-page checks now work, improving the
+previous blanket exclusion. The reviewer still found missing metadata/evidence
+status assertions and incomplete reading-to-paper mappings, and noted
+inconsistent extraction of uncertainty statements as activity assertions.
+Stored activity consistency does not prove actual external activity, and missing
+record fields do not establish negative claims. No superiority or academic
+approval is established.
+
+The first attempt timed out at 300 seconds. A 600-second retry returned an
+extraction containing one malformed expected-value string. Host contract 7 now
+retains malformed/nonfinite values as undetermined without losing valid facts,
+accepts equivalent record-root/envelope paths and dictionary-key membership.
+That saved extraction was explicitly revalidated under identical scientific
+inputs, followed by a fresh model review. Raw failed outputs, replay provenance
+and the original study remain preserved privately. Code changed during the
+recheck; this is diagnostic evidence, not a fixed-release evaluation.

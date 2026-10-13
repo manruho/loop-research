@@ -315,7 +315,7 @@ PROMPT_VERSIONS = {kind: 2 for kind in PROMPTS}
 
 from .verification import PROMPT as VERIFY_PROMPT
 PROMPTS["verify"] = VERIFY_PROMPT
-PROMPT_VERSIONS["verify"] = 6
+PROMPT_VERSIONS["verify"] = 7
 
 PROMPTS["revise_draft"] = (
     "Revise the supplied English manuscript to address the supplied citation/fact verification issues. "
