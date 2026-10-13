@@ -254,7 +254,7 @@ def validate_semantics(kind, data, result):
                 raise ResearchError("草稿本文にモデルが独自に挿入した引用記号があります。")
             if block["kind"] == "fact":
                 if not block["evidence_ids"]:
-                    raise ResearchError("根拠のない事実の断定が草稿にあります。")
+                    raise ResearchError(f"草稿段落 {block.get('id', 'unassigned')}: 根拠のない事実の断定が草稿にあります。")
                 limited = any(
                     evidences[eid]["level"] != "passage" or evidences[eid]["status"] != "checked"
                     or not evidences[eid]["document_source"]
@@ -314,18 +314,21 @@ PROMPT_VERSIONS = {kind: 2 for kind in PROMPTS}
 
 from .verification import PROMPT as VERIFY_PROMPT
 PROMPTS["verify"] = VERIFY_PROMPT
-PROMPT_VERSIONS["verify"] = 4
+PROMPT_VERSIONS["verify"] = 5
 
 PROMPTS["revise_draft"] = (
     "Revise the supplied English manuscript to address the supplied citation/fact verification issues. "
     "Keep the selected central claim unchanged; do not silently revise its thesis. Correct unsupported "
     "numbers, populations and factual generalizations, cite actual supplied evidence, or remove unsupported "
-    "assertions. Preserve normative premises and openly qualified hypotheses without fabricating support. "
+    "assertions. If validation_feedback is present, correct that host contract error. "
+    "Your own process/scope reports belong in interpretation blocks with explicit ledger-based "
+    "qualifications; do not misclassify them as source-backed fact blocks or fabricate E citations. "
+    "Preserve normative premises and openly qualified hypotheses without fabricating support. "
     "The result must substantively change the manuscript, not just its title. Return a full replacement "
     "DRAFT with the same seven section roles, claim mapping, and English source limitations. Use only "
     "supplied E IDs; the host adds citations. Do not claim that the fix is verified: it will be verified "
     "and reviewed again, including prior unresolved issues."
 )
-PROMPT_VERSIONS["revise_draft"] = 1
+PROMPT_VERSIONS["revise_draft"] = 2
 
 PROMPT_VERSIONS["review"] = 3

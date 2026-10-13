@@ -41,3 +41,43 @@
 ## 人間評価
 
 匿名化した原稿と採点表を作成し、ユーザーが先行研究・論証・反論・限定条件・追跡可能性と事実の支持を評価する。原稿がない実行の品質は欠測として保持する。結果取り込み後に本資料を更新する。手順は[EVALUATION.md](EVALUATION.md)を参照。
+
+## Narrow feasibility loop (2026-10-13)
+
+A separate developmental study asked whether research-agent reports should
+separate unverified claims from claims withdrawn after counterevidence. Requested
+author/reviewer models were gpt-6.1-sol/gpt-6-astra with low effort. It is not an
+additional comparative pilot run or evidence of superiority.
+
+The run produced an English draft, received an independent-context review,
+applied two accepted manuscript repairs without changing the selected thesis,
+and reverified/reviewed each replacement. The first verification yielded 37
+assertions (33 supported, 3 partial, 1 undetermined) and one incomplete block.
+The final current manuscript yielded 23 supported assertions in the model's
+assessment, with exact stored source/manuscript spans checked by the host.
+These are AI assessments, not human-confirmed factual truth.
+
+The final review still requested revision: factual claims about search counts,
+reading scope and evidence status were excluded by the verifier as process
+self-reports but treated by the reviewer as verifiable ledger assertions. After
+two accepted repairs left that disagreement unresolved, the controller was
+explicitly interrupted and the study handed off as `needs_human`. It was not
+marked ready or finalized. The current draft, three reviews, original source
+snapshots, failed repairs, replay provenance and interruption records remain in
+the private database/export.
+
+The exercise exposed and fixed total-search and abstract acquisition budget
+bypasses, operational resumes invalidating manuscripts, coverage failures
+unnecessarily discarding valid assertions, and missing draft-validation
+feedback. Code changed during the exercise; one saved model output was
+revalidated under the changed host coverage gate without another model call,
+with identical scientific inputs and explicit replay metadata. Three full-text
+sources and three extra abstracts had already been acquired before the budget
+fix; the originally intended three-source limit was therefore not achieved.
+Source hashes and all attempts are preserved. A future fixed-version run and
+human grading are required before drawing quality or efficiency conclusions.
+
+The loop now reaches drafting, review and manuscript revision in this case.
+The next methodological decision is how to verify internal ledger claims
+separately from literature-backed assertions, rather than repeating manuscript
+rewrites or weakening the factual gate.
