@@ -334,7 +334,7 @@ def metrics(root, run, case):
     if database.exists():
         # Read-only; never migrate an evaluation DB or alter its historical status during report.
         import sqlite3
-        conn = sqlite3.connect("file:" + str(database) + "?mode=ro", uri=True)
+        conn = sqlite3.connect(database.as_uri() + "?mode=ro", uri=True)
         try:
             observed = set()
             for row in conn.execute("SELECT doi,url,external_id FROM papers"):

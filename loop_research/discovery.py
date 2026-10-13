@@ -1,6 +1,7 @@
 """OpenAlex discovery: bounded, reproducible metadata and citation neighborhoods."""
 import json
 import os
+import re
 import urllib.parse
 from .common import ResearchError, canonical_text, identifier, label
 from .literature import get_bytes, http_url, MAX_METADATA
@@ -26,17 +27,35 @@ def request(url):
 
 
 def parse_work(work):
-    if not isinstance(work, dict) or not work.get("id", "").startswith("https://openalex.org/W"):
+    if not isinstance(work, dict) or not isinstance(work.get("id"), str) or not re.fullmatch(r"https://openalex.org/W[1-9][0-9]*", work["id"]):
         raise ResearchError("OpenAlex文献IDが不正です。")
-    title = canonical_text(work.get("title") or work.get("display_name") or "")
+    raw_title = work.get("title") or work.get("display_name") or ""
+    if not isinstance(raw_title, str):
+        raise ResearchError("OpenAlex文献タイトルの形式が不正です。")
+    title = canonical_text(raw_title)
     if not title:
         raise ResearchError("OpenAlex文献のタイトルがありません。")
     doi_url = work.get("doi") or ""
+    if not isinstance(doi_url, str) or (doi_url and not doi_url.startswith(("https://doi.org/", "http://doi.org/"))):
+        raise ResearchError("OpenAlex DOIの形式が不正です。")
     doi = doi_url.removeprefix("https://doi.org/").removeprefix("http://doi.org/")
     abstract = work.get("abstract_inverted_index") or {}
-    positions = {position: word for word, values in abstract.items() for position in values}
+    if not isinstance(abstract, dict):
+        raise ResearchError("OpenAlexの抄録形式が不正です。")
+    positions = {}
+    for word, values in abstract.items():
+        if not isinstance(word, str) or not isinstance(values, list) or any(type(p) is not int or p < 0 for p in values):
+            raise ResearchError("OpenAlex抄録の位置が不正です。")
+        for position in values:
+            if position in positions and positions[position] != word:
+                raise ResearchError("OpenAlex抄録の位置が衝突しています。")
+            positions[position] = word
     text = " ".join(positions[p] for p in sorted(positions))
     location = work.get("best_oa_location") or work.get("primary_location") or {}
+    if not isinstance(location, dict) or not isinstance(work.get("authorships", []), list):
+        raise ResearchError("OpenAlexの所在・著者情報が不正です。")
+    if any(not isinstance(a, dict) or not isinstance(a.get("author", {}), dict) or not isinstance(a.get("author", {}).get("display_name", ""), str) for a in work.get("authorships", [])):
+        raise ResearchError("OpenAlexの著者形式が不正です。")
     pdf = location.get("pdf_url") or ""
     url = location.get("landing_page_url") or doi_url or work["id"]
     return {"canonical_key": "doi:" + doi.lower() if doi else "openalex:" + work["id"].rsplit("/", 1)[-1],
@@ -73,8 +92,8 @@ def resolve(store, paper):
         work = request(BASE + "/" + row["external_id"])
     elif row["doi"]:
         work = request(BASE + "/" + urllib.parse.quote("https://doi.org/" + row["doi"], safe=""))
-    elif row["external_id"] and __import__("re").fullmatch(r"(?:\d{4}\.\d{4,5}|[a-zA-Z.-]+/\d{7})(?:v[1-9]\d*)?", row["external_id"]):
-        base_id = __import__("re").sub(r"v[0-9]+$", "", row["external_id"])
+    elif row["external_id"] and re.fullmatch(r"(?:\d{4}\.\d{4,5}|[a-zA-Z.-]+/\d{7})(?:v[1-9]\d*)?", row["external_id"]):
+        base_id = re.sub(r"v[0-9]+$", "", row["external_id"])
         work = request(BASE + "/" + urllib.parse.quote("https://doi.org/10.48550/arXiv." + base_id, safe=""))
     else:
         # No fuzzy title merge. User can supply an exact OpenAlex ID via paper add.

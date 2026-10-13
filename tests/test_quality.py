@@ -82,6 +82,17 @@ class QualityAcceptance(unittest.TestCase):
         self.assertEqual(result["response"]["meta"]["count"], 1)
         self.assertEqual(self.store.paper_row("P001")["abstract"], "Synthetic text")
 
+    def test_malformed_openalex_metadata_is_rejected_before_persistence(self):
+        for key, value in (("id", 1), ("title", 1), ("doi", 1), ("authorships", "bad"),
+                           ("abstract_inverted_index", {"a": [0], "b": [0]})):
+            with self.subTest(key=key):
+                item = work("W1")
+                item[key] = value
+                with patch("loop_research.discovery.request", return_value={"results": [item]}):
+                    with self.assertRaises(ResearchError): search_openalex(self.store, "query", 5)
+        self.assertEqual(self.store.list_papers(), [])
+        self.assertTrue(all(s["status"] == "failed" for s in self.store.list_searches()))
+
     def test_reference_graph_cycle_budget_and_direction(self):
         self.store.add_paper(parse_work(work("W1", refs=["W2", "W3"])))
         self.store.add_paper(parse_work(work("W2")))
