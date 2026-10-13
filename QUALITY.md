@@ -73,3 +73,15 @@ keyword searches, including failed searches, fallback providers, and requests
 from comparisons/reviews/redesigns. Citation traversal has its separate budget.
 Requests beyond the cap stay in their originating artifacts as unresolved work;
 budget limits never turn missing evidence into support.
+
+Fact-labeled blocks with no extracted assertions are retained as incomplete
+coverage, with the verifier's original status and a host adjustment recorded.
+Other validated assertions survive this gate; incomplete coverage still blocks
+completion and creates a major review issue. Contradictory coverage and invalid
+source/manuscript spans remain rejected. Verification contract version 5 makes
+old reports stale for the changed host rule.
+
+Operational resume reasons remain in the audit history but do not change the
+scientific input basis. Use `study guide` to give substantive research direction;
+explicit guidance, claim changes, source changes and human issue decisions still
+invalidate affected artifacts.

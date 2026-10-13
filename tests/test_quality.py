@@ -283,6 +283,30 @@ class QualityAcceptance(unittest.TestCase):
         self.assertNotEqual(workflow.current_verification()["id"], before["id"])
         self.assertIsNone(workflow.latest_relevant_review())
 
+    def test_operational_resume_preserves_current_scientific_artifacts(self):
+        workflow = self.full()
+        draft = workflow.current_artifact("draft")["id"]
+        verified = workflow.current_verification()["id"]
+        self.store.control_study("needs_human", "Adapter failed")
+        self.store.control_study("active", "Retry without changing research direction", actor="human")
+        self.assertEqual(workflow.current_artifact("draft")["id"], draft)
+        self.assertEqual(workflow.current_verification()["id"], verified)
+
+    def test_unextracted_fact_block_remains_blocking_without_discarding_valid_facts(self):
+        workflow = self.full()
+        data = workflow.data_for("verify")
+        raw, _ = FixtureEngine().execute("verify", data, "", {})
+        block = next(b for b in roles.blocks(data["draft"]["content"]) if b["id"] != raw["facts"][0]["block_id"])
+        block["kind"] = "fact"
+        coverage = next(c for c in raw["coverage"] if c["block_id"] == block["id"])
+        coverage.update(status="no_facts", reason="Process self-report, not a literature assertion")
+        result = verification.normalize(data, raw)
+        item = next(c for c in result["coverage"] if c["block_id"] == block["id"])
+        self.assertEqual(item["status"], "incomplete")
+        self.assertEqual(item["model_status"], "no_facts")
+        self.assertIn(item, verification.blocking(result))
+        self.assertEqual(result["facts"][0]["verdict"], "supported")
+
     def test_mixed_paragraph_facts_and_qualification_have_separate_spans(self):
         workflow = self.full()
         data = workflow.data_for("verify")

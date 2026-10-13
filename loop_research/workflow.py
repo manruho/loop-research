@@ -101,7 +101,7 @@ class ResearchWorkflow:
         return artifact
 
     def human_guidance(self):
-        relevant = {"study.configured", "study.claim_selected", "study.controlled", "issue.responded",
+        relevant = {"study.configured", "study.claim_selected", "issue.responded",
                     "claim.revised", "claim.decided", "study.guidance"}
         result = []
         for event in self.store.history():
