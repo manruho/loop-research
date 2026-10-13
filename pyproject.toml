@@ -1,0 +1,16 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "loop-research"
+version = "1.0.0"
+description = "A traceable, revisable research ledger for position papers"
+requires-python = ">=3.10"
+dependencies = []
+
+[project.scripts]
+research = "loop_research.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["loop_research*"]
