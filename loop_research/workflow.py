@@ -20,7 +20,7 @@ from .workflow_store import digest, encoded
 
 SCHEMAS = {
     "orientation": roles.ORIENTATION, "reading": roles.READING, "exploration": roles.EXPLORATION,
-    "comparison": roles.COMPARISON, "outline": roles.OUTLINE, "draft": roles.DRAFT,
+    "comparison": roles.COMPARISON, "outline": roles.OUTLINE, "draft": roles.DRAFT, "revise_draft": roles.DRAFT,
     "review": roles.REVIEW, "verify": verification.VERIFY, "redesign": roles.REDESIGN, "decision": roles.DECISION,
 }
 HANDLERS = {kind: "apply_" + kind for kind in SCHEMAS}
@@ -276,11 +276,18 @@ class ResearchWorkflow:
         common = {"claim_id": cid, "basis": self.basis(cid), "context": context}
         if kind == "outline":
             return common
-        if kind == "draft":
+        if kind in ("draft", "revise_draft"):
             outline = self.current_artifact("outline")
             if not outline:
                 raise ResearchError("現行状態に対応する論証を先に作成してください。")
             common["outline"] = {"id": outline["id"], "content": outline["content"]}
+            if kind == "revise_draft":
+                draft, review = self.current_artifact("draft"), self.latest_relevant_review()
+                if not draft or not review:
+                    raise ResearchError("草稿の修正には現行草稿の検証と査読が必要です。")
+                common["previous_draft"] = {"id": draft["id"], "content": draft["content"]}
+                common["review"] = {"id": review["id"], "content": review["content"]}
+                common["verification"] = self.current_verification()["content"]
             return common
         if kind in ("review", "verify"):
             draft = self.current_artifact("draft")
@@ -373,9 +380,10 @@ class ResearchWorkflow:
             else:
                 if kind == "review":
                     for item in verification.blocking(data["verification"]["content"]):
-                        target = item["block_id"]
-                        if not any(f["severity"] in ("major", "critical") and f["target_id"] == target for f in raw["findings"]):
-                            raw["findings"].append({"severity": "major", "category": "citation", "target_type": "block", "target_id": target,
+                        target_type = "fact" if "verdict" in item else "block"
+                        target = item["id"] if target_type == "fact" else item["block_id"]
+                        if not any(f["severity"] in ("major", "critical") and ((f["target_type"] == target_type and f["target_id"] == target) or (f["target_type"] == "block" and f["target_id"] == item["block_id"])) for f in raw["findings"]):
+                            raw["findings"].append({"severity": "major", "category": "citation", "target_type": target_type, "target_id": target,
                                                    "explanation": "Host fact gate: " + item.get("verdict", item.get("status", "")) + ": " + item["reason"],
                                                    "evidence_ids": [], "suggested_action": "revise", "remaining_uncertainty": item.get("qualification") or item["reason"]})
                     if verification.blocking(data["verification"]["content"]) and raw["decision"] == "ready_for_human":
@@ -614,7 +622,10 @@ class ResearchWorkflow:
                 unlinked = self.unlinked_evidence(selected)
                 if unlinked:
                     add("ground", "新たな原文を主張へ暫定的に結び付け、査読に基づく再設計へ渡す", claim=selected)
-                add("redesign", "重大な査読指摘へ応答し、再調査・主張の限定・撤回を選ぶ")
+                if blocking and all(issue["content"]["category"] == "citation" for issue in blocking) and review["content"]["decision"] == "revise" and self.current_artifact("outline"):
+                    add("revise_draft", "引用・事実の問題を草稿で修正し、中心主張は保持して再検証する")
+                else:
+                    add("redesign", "重大な査読指摘へ応答し、再調査・主張の限定・撤回を選ぶ")
                 return result
         if result:
             return result

@@ -110,7 +110,7 @@ def parser():
     imported = actions.add_parser("import-draft", help="人間が編集した構造化草稿を新しい版として取り込む")
     imported.add_argument("--file", required=True)
     imported.add_argument("--reason", required=True)
-    for name in ("orient", "explore", "compare", "outline", "draft", "verify", "review", "redesign", "read"):
+    for name in ("orient", "explore", "compare", "outline", "draft", "revise-draft", "verify", "review", "redesign", "read"):
         role = actions.add_parser(name, help="この工程だけを実行")
         study_options(role)
         role.add_argument("--force", action="store_true", help="同じ入力でも新しい評価を依頼")
@@ -302,7 +302,7 @@ def dispatch(store, args):
         if args.action in ("run", "resume"):
             return workflow.run(args.steps, getattr(args, "reason", None))
         kind = {"orient": "orientation", "explore": "exploration", "compare": "comparison",
-                "read": "reading"}.get(args.action, args.action)
+                "read": "reading", "revise-draft": "revise_draft"}.get(args.action, args.action)
         with study_lock(store):
             workflow.recover()
             parameters = {"document": args.id, "page": args.page} if args.action == "read" else {}

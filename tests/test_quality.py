@@ -153,7 +153,7 @@ class QualityAcceptance(unittest.TestCase):
             workflow.run(10)
             workflow.perform("review")
         self.assertNotEqual(self.store.study_state()["status"], "ready_for_human")
-        self.assertTrue(any(i["severity"] == "major" for i in self.store.list_issues()))
+        self.assertTrue(any(i["severity"] == "major" and i["content"]["target_type"] == "fact" for i in self.store.list_issues()))
         with self.assertRaises(ResearchError): workflow.finalize("No override")
 
     def test_explicit_models_required_and_review_routing(self):
@@ -202,6 +202,28 @@ class QualityAcceptance(unittest.TestCase):
         draft = workflow.current_artifact("draft")
         papers = {self.store.evidence_provenance(eid)["paper_id"] for block in roles.blocks(draft["content"]) for eid in block["evidence_ids"]}
         self.assertIn("P002", papers)
+
+    def test_citation_only_repair_keeps_thesis_revision_and_invalidates_old_verification(self):
+        workflow = self.full()
+        selected = self.store.study_state()["selected_claim_id"]
+        before = self.store.claim_row(selected)
+        old_draft = workflow.current_artifact("draft")
+        review = workflow.latest_relevant_review()
+        self.store.control_study("active", "Reopen citation issue")
+        from loop_research.workflow_store import encoded
+        finding = {"category": "citation", "target_type": "block", "target_id": "B002", "explanation": "Population scope needs a caveat", "suggested_action": "revise", "evidence_ids": [], "remaining_uncertainty": "External validity"}
+        with self.store.db:
+            content = copy.deepcopy(review["content"])
+            content["decision"] = "revise"
+            self.store.db.execute("UPDATE artifacts SET content_json=? WHERE id=?", (encoded(content), int(review["id"][1:])))
+            self.store.db.execute("INSERT INTO issues(review_id,draft_id,severity,status,content_json,response,remaining_uncertainty,updated_at) VALUES(?,?,'major','open',?,'','External validity','fixture')", (int(review["id"][1:]), int(old_draft["id"][1:]), encoded(finding)))
+        self.assertIn("revise_draft", [c["kind"] for c in workflow.choices()])
+        with contextlib.redirect_stderr(io.StringIO()):
+            workflow.perform("revise_draft")
+        self.assertEqual(self.store.claim_row(selected)["revision"], before["revision"])
+        self.assertNotEqual(workflow.current_artifact("draft")["id"], old_draft["id"])
+        self.assertIsNone(workflow.current_verification())
+        self.assertTrue(any(i["status"] == "open" for i in self.store.list_issues()))
 
     def test_review_model_change_invalidates_verification_without_self_invalidation(self):
         workflow = self.full()
@@ -276,9 +298,13 @@ class QualityAcceptance(unittest.TestCase):
                               "facts": [{"id": "Fact-01", "text": "A factual assertion", "verdict": None, "source_locator": "", "reason": ""}]}]}
         (self.root / "blind-packet").mkdir()
         save(self.root / "blind-packet" / "scores.json", scores)
+        save(self.root / "private-score-template.json", scores)
         save(self.root / "private-sample-map.json", {"Sample-01": {"case_id": "case", "method": "baseline"}})
         save(self.root / "submitted.json", scores)
         with self.assertRaises(ResearchError): import_scores(self.root, self.root / "submitted.json")
+        scores["samples"][0]["scores"] = {k: 5 for k in scores["samples"][0]["scores"]}
+        scores["samples"][0]["facts"][0].update(verdict="supported", source_locator="p.1", reason="Synthetic test only")
         scores["samples"][0]["facts"][0]["text"] = "Altered assertion"
+        save(self.root / "blind-packet" / "scores.json", scores)
         save(self.root / "submitted.json", scores)
         with self.assertRaises(ResearchError): import_scores(self.root, self.root / "submitted.json")

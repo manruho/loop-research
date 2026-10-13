@@ -66,7 +66,7 @@ DRAFT = obj(
 FINDING = obj(
     severity=string(("critical", "major", "minor")),
     category=string(("novelty", "citation", "logic", "counterexample", "scope", "contribution")),
-    target_type=string(("draft", "block", "claim", "evidence", "paper")),
+    target_type=string(("draft", "block", "fact", "claim", "evidence", "paper")),
     target_id=string(minimum=1, maximum=30), explanation=TEXT, evidence_ids=IDS,
     suggested_action=string(("search", "read", "redesign", "revise", "withdraw", "hold")),
     remaining_uncertainty=TEXT,
@@ -152,7 +152,7 @@ PROMPTS = {
         "novelty, fairness to prior work, citation support, logical leaps, strongest counterexamples, "
         "scope and venue contribution. Inspect verification.coverage and facts for extraction omissions, "
         "compound assertions, numbers, populations, negation and causal leaps. A citation on a paragraph "
-        "does not establish support for each assertion. Target exact supplied block/draft/claim/evidence/paper IDs. "
+        "does not establish support for each assertion. Target exact supplied fact/block/draft/claim/evidence/paper IDs; F IDs are scoped to the supplied verification artifact. "
         "Each criticism needs a reason and suggested repair, not a score. "
         "Check that block kinds are honest: labeling an empirical assertion as a position must not evade evidence requirements. "
         "Distinguish lack of evidence from evidence against the claim. Do not close a prior issue merely because wording changed. "
@@ -234,7 +234,13 @@ def validate_semantics(kind, data, result):
                     raise ResearchError("事実を述べる前提に根拠がありません。")
             for objection in section["counterarguments"]:
                 check_ids(objection["evidence_ids"], evidences, "反論の根拠")
-    elif kind == "draft":
+    elif kind in ("draft", "revise_draft"):
+        if kind == "revise_draft":
+            previous = data["previous_draft"]["content"]
+            old_blocks = [(b["text"], b["kind"], b["evidence_ids"], b["qualification"]) for b in blocks(previous)]
+            new_blocks = [(b["text"], b["kind"], b["evidence_ids"], b["qualification"]) for b in blocks(result)]
+            if old_blocks == new_blocks:
+                raise ResearchError("草稿の本文・引用・限定条件が変更されていません。")
         required_roles = {"introduction", "related_work", "position", "counterarguments",
                           "implications", "limitations", "conclusion"}
         if {section["role"] for section in result["sections"]} != required_roles:
@@ -261,7 +267,8 @@ def validate_semantics(kind, data, result):
         if result["decision"] == "ready_for_human" and blocking(data["verification"]["content"]):
             raise ResearchError("未支持の事実主張や抽出不足を残したまま人間確認へ進めません。")
         targets = {"draft": {data["draft"]["id"]}, "block": {b["id"] for b in blocks(data["draft"]["content"])},
-                   "claim": set(claims), "evidence": set(evidences), "paper": set(papers)}
+                   "claim": set(claims), "evidence": set(evidences), "paper": set(papers),
+                   "fact": {f["id"] for f in data["verification"]["content"]["facts"]}}
         for finding in result["findings"]:
             if finding["target_id"] not in targets[finding["target_type"]]:
                 raise ResearchError("査読の指摘先が入力に存在しません。")
@@ -308,3 +315,17 @@ PROMPT_VERSIONS = {kind: 2 for kind in PROMPTS}
 from .verification import PROMPT as VERIFY_PROMPT
 PROMPTS["verify"] = VERIFY_PROMPT
 PROMPT_VERSIONS["verify"] = 4
+
+PROMPTS["revise_draft"] = (
+    "Revise the supplied English manuscript to address the supplied citation/fact verification issues. "
+    "Keep the selected central claim unchanged; do not silently revise its thesis. Correct unsupported "
+    "numbers, populations and factual generalizations, cite actual supplied evidence, or remove unsupported "
+    "assertions. Preserve normative premises and openly qualified hypotheses without fabricating support. "
+    "The result must substantively change the manuscript, not just its title. Return a full replacement "
+    "DRAFT with the same seven section roles, claim mapping, and English source limitations. Use only "
+    "supplied E IDs; the host adds citations. Do not claim that the fix is verified: it will be verified "
+    "and reviewed again, including prior unresolved issues."
+)
+PROMPT_VERSIONS["revise_draft"] = 1
+
+PROMPT_VERSIONS["review"] = 3

@@ -508,6 +508,11 @@ class WorkflowStore:
                    {"draft_id": artifact, "claim_id": data["claim_id"], "basis": data["basis"]})
         self._set_study("草稿は作成済み。学術的な確認と内部査読は未完了。", phase="review")
 
+    def apply_revise_draft(self, tid, key, data, result):
+        self.apply_draft(tid, key, data, result)
+        self.event("draft.revised", "査読に基づく草稿の修正。中心主張の版は保持し、再検証・再査読する。",
+                   {"previous_draft": data["previous_draft"]["id"], "review_id": data["review"]["id"], "claim_id": data["claim_id"]})
+
     def apply_review(self, tid, key, data, result):
         draft = self.artifact_row(data["draft"]["id"])
         review = self._artifact("review", key, tid, data, result, data["claim_id"])

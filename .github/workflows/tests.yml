@@ -1,7 +1,7 @@
 name: Offline acceptance tests
 on:
   push:
-    branches: [main, feat/research-quality]
+    branches: [main]
   pull_request:
 permissions:
   contents: read

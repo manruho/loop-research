@@ -261,6 +261,7 @@ def packet(output, reviewer_model):
                             "extraction_limitations": limitation, "omitted_factual_assertions": "",
                             "source_access_problems": "", "reference_set_relevance": ""})
         save(stage / "scores.json", {"samples": samples})
+        save(root / "private-score-template.json", {"samples": samples})
         (stage / "README.md").write_text("# Human evaluation\n\nScore prior_work, argument, counterarguments, qualification, traceability on 1–5 (1 poor, 3 mixed, 5 strong). Explain judgments. Leave unavailable manuscripts null.\n\nFor each fact choose supported, partial, contradicted, undetermined, or not_factual; record a primary-source page/section and reason. Check negation, numbers, scope, causal inference and extraction omissions. AI extraction is not ground truth. Source inaccessibility means undetermined, not contradicted.\n\nMethod identity is withheld, but formatting/content can still reveal it; blinding is imperfect. Return scores.json. Source links are in the manuscripts.\n")
         save(root / "private-sample-map.json", mapping)
         stage.rename(target)
@@ -271,9 +272,36 @@ def packet(output, reviewer_model):
     return {"packet": str(target), "human_evaluation": "pending", "private_mapping": "Do not give private-sample-map.json to evaluator"}
 
 
+def score_template(root):
+    """Keep expected facts separate from the human-editable scores.json."""
+    path = root / "private-score-template.json"
+    if path.exists():
+        return read(path)
+    # Upgrade packets created before the independent snapshot was introduced.
+    # Reconstruct from saved extraction outputs, never trust edited score contents.
+    mapping = read(root / "private-sample-map.json")
+    manifest = read(root / "manifest.json")
+    samples = []
+    for code, identity in mapping.items():
+        run = next((r for r in manifest["runs"] if (r["case_id"], r["method"]) == (identity["case_id"], identity["method"])), None)
+        if run is None:
+            raise ResearchError("評価票の原本を再構築できません。実行記録が欠けています。")
+        successful = (root / run["path"] / "draft.md").exists() and run["status"] not in ("failed", "timed_out", "interrupted")
+        facts = []
+        if successful:
+            extracted = read(root / (code + "-extraction.json"))["result"]
+            facts = list(dict.fromkeys(extracted["facts"]))
+            if len(facts) > 20:
+                facts = random.Random(108).sample(facts, 20)
+        samples.append({"sample_id": code, "manuscript_available": successful,
+                        "facts": [{"id": f"Fact-{i+1:02d}", "text": f} for i, f in enumerate(facts)]})
+    save(path, {"samples": samples})
+    return {"samples": samples}
+
+
 def import_scores(output, path):
     root = Path(output).resolve()
-    original = read(root / "blind-packet" / "scores.json")
+    original = score_template(root)
     submitted = read(path)
     mapping = read(root / "private-sample-map.json")
     if not isinstance(submitted, dict) or not isinstance(submitted.get("samples"), list):
@@ -361,7 +389,8 @@ def report(output):
     lines = ["# Exploratory evaluation", "", "Human evaluation: " + manifest["human_evaluation"], "",
              "| Case | Method | Status | Seconds |", "| --- | --- | --- | --- |"]
     for run in manifest["runs"]:
-        lines.append(f"| {run['case_id']} | {run['method']} | {run['status']} | {run.get('elapsed_seconds', 0):.1f} |")
+        seconds = f"{run['elapsed_seconds']:.1f}" if "elapsed_seconds" in run else "unrecorded"
+        lines.append(f"| {run['case_id']} | {run['method']} | {run['status']} | {seconds} |")
     lines += ["", "## Limits", ""] + ["- " + x for x in manifest["limitations"]]
     lines += ["", "## Observations", "", "| Case | Method | Reference IDs in final / limited set | Native fact verification |", "| --- | --- | --- | --- |"]
     for run in observed_runs:
