@@ -28,12 +28,13 @@ def study_options(command, steps=False):
     command.add_argument("--provider", choices=["arxiv", "crossref", "openalex"])
     command.add_argument("--paper-limit", type=int)
     command.add_argument("--pages", type=int, dest="pages_per_document")
+    command.add_argument("--search-budget", type=int, help="追加・代替検索を含む通算検索上限（引用追跡は別予算）")
     command.add_argument("--queries", type=int, dest="query_limit")
 
 
 def configure_options(store, args):
     settings = {key: getattr(args, key) for key in (
-        "model", "review_model", "review_effort", "citation_seeds", "citation_limit", "citation_budget", "timeout", "reasoning_effort", "provider", "paper_limit", "pages_per_document", "query_limit"
+        "model", "review_model", "review_effort", "citation_seeds", "citation_limit", "citation_budget", "timeout", "reasoning_effort", "provider", "paper_limit", "pages_per_document", "query_limit", "search_budget"
     ) if getattr(args, key, None) is not None}
     if settings:
         store.configure_study(getattr(args, "reason", None) or "CLI実行時の設定", settings=settings)
@@ -275,7 +276,7 @@ def dispatch(store, args):
     if args.command == "study":
         if args.action == "configure":
             settings = {key: getattr(args, key) for key in (
-                "model", "review_model", "review_effort", "citation_seeds", "citation_limit", "citation_budget", "timeout", "reasoning_effort", "provider", "paper_limit", "pages_per_document", "query_limit"
+                "model", "review_model", "review_effort", "citation_seeds", "citation_limit", "citation_budget", "timeout", "reasoning_effort", "provider", "paper_limit", "pages_per_document", "query_limit", "search_budget"
             ) if getattr(args, key, None) is not None}
             return store.configure_study(args.reason, args.question, args.audience, args.venue, settings)
         if args.action == "select":

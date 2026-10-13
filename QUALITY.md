@@ -56,7 +56,7 @@ For example:
 ```bash
 research --db .research/small.sqlite3 start "Your narrow research question" \
   --model gpt-6.1-sol --review-model gpt-6-astra \
-  --paper-limit 3 --pages 1 --queries 1 \
+  --paper-limit 3 --pages 1 --queries 1 --search-budget 4 \
   --citation-seeds 1 --citation-limit 2 --citation-budget 2 \
   --effort low --timeout 300 --steps 60 --seconds 1800
 ```
@@ -67,3 +67,9 @@ Resume with an explicit reason and another invocation budget. Human holds,
 withdrawals, missing evidence and critical reviews are never bypassed to force
 completion. Prompt scope summaries keep query/status and reading boundaries;
 full search records remain in the database and exports.
+
+`--queries` limits initial orientation queries. `--search-budget` caps all attempted
+keyword searches, including failed searches, fallback providers, and requests
+from comparisons/reviews/redesigns. Citation traversal has its separate budget.
+Requests beyond the cap stay in their originating artifacts as unresolved work;
+budget limits never turn missing evidence into support.

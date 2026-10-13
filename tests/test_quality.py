@@ -57,6 +57,29 @@ class QualityAcceptance(unittest.TestCase):
                         ["study", "resume", "--reason", "Continue", "--seconds", "120"]):
             self.assertEqual(parser().parse_args(command).seconds, 120)
 
+    def test_acquisition_cap_cannot_be_bypassed_with_unattempted_abstracts(self):
+        workflow = ResearchWorkflow(self.store, FixtureEngine())
+        workflow.perform("orientation")
+        self.store.configure_study("One acquisition", settings={"paper_limit": 1})
+        fake_search(self.store, "synthetic workload", "arxiv", 1)
+        fake_fetch(self.store, "P001")
+        self.store.add_paper({"canonical_key": "synthetic:other", "provider": "synthetic-fixture",
+                              "external_id": "other", "title": "Synthetic other", "url": "https://fixture.invalid/other",
+                              "abstract": "A synthetic abstract."})
+        with patch.object(workflow, "ranked_papers", return_value=[self.store.show_paper("P002")]):
+            choices = workflow.choices()
+        self.assertFalse(any(c["kind"] == "fetch" and c["parameters"]["paper"] == "P002" for c in choices))
+
+    def test_total_search_budget_includes_failures_and_fallback(self):
+        workflow = ResearchWorkflow(self.store, FixtureEngine())
+        workflow.perform("orientation")
+        self.store.configure_study("Cap total searches", settings={"search_budget": 1})
+        query = workflow.pending_queries()[0]
+        sid = self.store.start_search(query["provider"], query["query"], 1, "https://example.invalid")
+        self.store.finish_search(sid, error="Unavailable")
+        self.assertEqual(workflow.pending_queries(), [])
+        self.assertEqual(self.store.show_search("S001")["status"], "failed")
+
     def test_invalid_time_budgets_do_not_start_tasks(self):
         workflow = ResearchWorkflow(self.store, FixtureEngine())
         for value in (0, -1, float("nan"), float("inf"), True):

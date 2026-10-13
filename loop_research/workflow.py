@@ -539,7 +539,9 @@ class ResearchWorkflow:
             if failures and fallback not in done and fallback not in seen:
                 result.append(dict(query, provider=alternative, purpose="検索先の障害・制限に対する別の探索範囲"))
                 seen.add(fallback)
-        return result
+        attempted = sum(not row["query"].startswith("graph:") for row in self.store.list_searches())
+        remaining = max(0, self.store.study_state()["settings"]["search_budget"] - attempted)
+        return result[:remaining]
 
     def unlinked_evidence(self, claim):
         state = self.store.study_state()
@@ -591,7 +593,7 @@ class ResearchWorkflow:
             if not documents:
                 if not attempts and len(attempted_papers) < settings["paper_limit"]:
                     add("fetch", "取得できる本文を確認し、未取得の資料を読んだことにしない", paper=item["id"], abstract=False)
-                elif paper["abstract"] and not any(doc["origin"] == "abstract" for doc in paper["documents"]):
+                elif attempts and paper["abstract"] and not any(doc["origin"] == "abstract" for doc in paper["documents"]):
                     add("fetch", "本文の取得失敗を残したまま、抄録だけを別の範囲として確認", paper=item["id"], abstract=True)
             for doc in documents:
                 seen = self.read_pages(doc["id"])
