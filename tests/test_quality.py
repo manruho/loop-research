@@ -41,6 +41,29 @@ class QualityAcceptance(unittest.TestCase):
         self.assertEqual(result["state"]["status"], "ready_for_human", result["state"]["reason"])
         return workflow
 
+    def test_prompt_scope_omits_raw_responses_but_preserves_audit(self):
+        sid = self.store.start_search("arxiv", "test", 1, "https://example.invalid")
+        self.store.finish_search(sid, response={"large_payload": "x" * 10000})
+        workflow = ResearchWorkflow(self.store, FixtureEngine())
+        scope = workflow.prompt_scope()
+        self.assertNotIn("response", scope["searches"][0])
+        self.assertEqual(scope["searches"][0]["query"], "test")
+        self.assertIn("large_payload", self.store.show_search("S001")["response"])
+
+    def test_cli_accepts_invocation_time_budget(self):
+        from loop_research.cli import parser
+        for command in (["start", "Narrow question", "--seconds", "120"],
+                        ["study", "run", "--seconds", "120"],
+                        ["study", "resume", "--reason", "Continue", "--seconds", "120"]):
+            self.assertEqual(parser().parse_args(command).seconds, 120)
+
+    def test_invalid_time_budgets_do_not_start_tasks(self):
+        workflow = ResearchWorkflow(self.store, FixtureEngine())
+        for value in (0, -1, float("nan"), float("inf"), True):
+            with self.assertRaises(ResearchError):
+                workflow.run(max_seconds=value)
+        self.assertEqual(self.store.list_tasks(), [])
+
     def test_manual_revision_retains_question_but_not_old_assessments(self):
         self.store.configure_study("New topic", question="Changed question")
         claim = self.store.add_claim("Position on changed question")

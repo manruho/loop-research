@@ -15,6 +15,7 @@ from .export import export_study
 
 def study_options(command, steps=False):
     if steps:
+        command.add_argument("--seconds", type=float, help="今回の実行時間上限（秒）。未完了の作業は保存して再開可能")
         command.add_argument("--steps", type=int, default=20, help="今回の作業上限。到達は研究完成を意味しない")
     command.add_argument("--model")
     command.add_argument("--review-model")
@@ -260,7 +261,7 @@ def dispatch(store, args):
         if args.audience or args.venue:
             store.configure_study("初期研究設定", audience=args.audience, venue=args.venue)
         configure_options(store, args)
-        return ResearchWorkflow(store).run(args.steps)
+        return ResearchWorkflow(store).run(args.steps, max_seconds=args.seconds)
     if args.command == "status":
         return store.status()
     if args.command == "history":
@@ -300,7 +301,7 @@ def dispatch(store, args):
         if args.action == "import-draft":
             return workflow.import_draft(args.file, args.reason)
         if args.action in ("run", "resume"):
-            return workflow.run(args.steps, getattr(args, "reason", None))
+            return workflow.run(args.steps, getattr(args, "reason", None), max_seconds=args.seconds)
         kind = {"orient": "orientation", "explore": "exploration", "compare": "comparison",
                 "read": "reading", "revise-draft": "revise_draft"}.get(args.action, args.action)
         with study_lock(store):

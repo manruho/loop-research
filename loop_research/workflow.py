@@ -149,6 +149,20 @@ class ResearchWorkflow:
         return {"searches": self.store.list_searches(), "readings": readings, "citation_graph": self.store.citation_graph(),
                 "notice": "限定的な検索・指定箇所のAI読解。全文精読・新規性の証明・人間の確認ではない。"}
 
+    def prompt_scope(self):
+        """Keep search boundaries without repeating raw provider responses in prompts."""
+        scope = self.scope()
+        return {
+            "searches": [{key: search.get(key) for key in
+                          ("id", "provider", "query", "status", "error")}
+                         for search in scope["searches"]],
+            "readings": scope["readings"],
+            "citation_graph": scope["citation_graph"],
+            "limits": self.store.study_state()["settings"],
+            "notice": scope["notice"],
+            "omitted_from_prompt": "Raw search responses remain in the study database and export.",
+        }
+
     def context(self, only_claim=None, for_comparison=False):
         state = self.store.study_state()
         if only_claim:
@@ -196,7 +210,7 @@ class ResearchWorkflow:
             }
         return {"question": state["question"], "audience": state["audience"], "venue": state["venue"],
                 "claims": claims, "evidence": evidence, "excerpts": excerpts, "papers": papers,
-                "scope": self.scope(), "human_guidance": self.human_guidance()}
+                "scope": self.prompt_scope(), "human_guidance": self.human_guidance()}
 
     def selected(self):
         state = self.store.study_state()
@@ -764,6 +778,8 @@ class ResearchWorkflow:
         }
 
     def run(self, steps=20, resume_reason=None, max_seconds=None):
+        if max_seconds is not None and (not isinstance(max_seconds, (int, float)) or isinstance(max_seconds, bool) or not 0 < max_seconds < float("inf")):
+            raise ResearchError("実行時間上限は有限の正数で指定してください。")
         self.deadline = time.monotonic() + max_seconds if max_seconds is not None else None
         if type(steps) is not int or not 1 <= steps <= 1000:
             raise ResearchError("作業上限は1〜1000で指定してください。")
