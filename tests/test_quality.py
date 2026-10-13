@@ -283,6 +283,22 @@ class QualityAcceptance(unittest.TestCase):
         self.assertNotEqual(workflow.current_verification()["id"], before["id"])
         self.assertIsNone(workflow.latest_relevant_review())
 
+    def test_failed_draft_repair_returns_validation_feedback_for_same_input(self):
+        workflow = self.full()
+        original = workflow.engine.execute
+        def invalid(kind, data, prompt, schema, on_spawn=None):
+            raw, execution = original(kind, data, prompt, schema, on_spawn)
+            if kind == "revise_draft":
+                raw["sections"][1]["blocks"][0]["evidence_ids"] = []
+            return raw, execution
+        with patch.object(workflow.engine, "execute", side_effect=invalid):
+            with self.assertRaises(ResearchError):
+                workflow.perform("revise_draft")
+        data = workflow.data_for("revise_draft")
+        self.assertIn("validation_feedback", data)
+        self.assertIn("根拠のない事実", data["validation_feedback"]["error"])
+        self.assertIsNotNone(workflow.current_verification())
+
     def test_operational_resume_preserves_current_scientific_artifacts(self):
         workflow = self.full()
         draft = workflow.current_artifact("draft")["id"]

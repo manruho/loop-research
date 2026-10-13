@@ -302,6 +302,14 @@ class ResearchWorkflow:
                 common["previous_draft"] = {"id": draft["id"], "content": draft["content"]}
                 common["review"] = {"id": review["id"], "content": review["content"]}
                 common["verification"] = self.current_verification()["content"]
+                for task in reversed(self.store.list_tasks()):
+                    if task["kind"] != "revise_draft" or task["status"] != "failed":
+                        continue
+                    previous = self.store.show_task(task["id"])
+                    prior_input = previous["input"]["data"]
+                    if prior_input.get("basis") == common["basis"] and prior_input.get("previous_draft", {}).get("id") == draft["id"]:
+                        common["validation_feedback"] = {"task_id": task["id"], "error": previous["error"]}
+                        break
             return common
         if kind in ("review", "verify"):
             draft = self.current_artifact("draft")

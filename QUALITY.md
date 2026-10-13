@@ -85,3 +85,10 @@ Operational resume reasons remain in the audit history but do not change the
 scientific input basis. Use `study guide` to give substantive research direction;
 explicit guidance, claim changes, source changes and human issue decisions still
 invalidate affected artifacts.
+
+Manuscript repair receives the most recent failed repair's validation error only
+when the scientific basis and source draft still match. This lets the author
+correct contract violations without relaxing source requirements. Reports of
+its own workflow use explicitly qualified interpretation blocks, not fabricated
+literature citations. Empirical assertions in any block remain subject to fact
+extraction and review.
