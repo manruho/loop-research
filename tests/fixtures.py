@@ -84,7 +84,7 @@ class FixtureEngine:
                     facts.append({"id": "F001", "block_id": block["id"], "field": "text", "text": block["text"], "occurrence": 1,
                                   "sources": [{"evidence_id": eid, "quote": data["source_spans"][eid]["quote"], "occurrence": 1}],
                                   "verdict": "supported", "reason": "Synthetic passage only", "qualification": "Synthetic evidence is not a real scientific result."})
-            result = {"facts": facts, "coverage": coverage, "limitations": notes}
+            result = {"facts": facts, "coverage": coverage, "ledger_claims": [], "ledger_coverage": [{"block_id": b["id"], "status": "no_facts", "reason": "No record assertions in synthetic draft"} for b in blocks(data["draft"]["content"])], "limitations": notes}
         elif kind == "review":
             self.reviews += 1
             findings = []

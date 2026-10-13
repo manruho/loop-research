@@ -42,3 +42,99 @@ CLIの版は2.0.0。自律研究のモデル指定を必須にしたため、旧
 ## 未対応・残る限界
 
 OCR、図表・数式の専門的解釈、網羅的な全文読解、異なる出版版の自動同定は未対応。選択したページだけを読むため、出典自体の誤り、別箇所の限定条件、重要研究の未収録、事実抽出と支持判断の誤りは残る。確認範囲と取得不能資料を研究成果の一部として出力する。
+
+## Bounded feasibility runs
+
+The first pilot spent most of its 30-minute allowance before drafting: 19–20
+page readings and 44–46 model-based action decisions. Source-only scheduling
+now runs deterministically. A small feasibility run should additionally declare
+its acquisition and reading limits before execution, leaving time for drafting
+and verification. This is a scoped study, not a comprehensive literature review.
+
+For example:
+
+```bash
+research --db .research/small.sqlite3 start "Your narrow research question" \
+  --model gpt-6.1-sol --review-model gpt-6-astra \
+  --paper-limit 3 --pages 1 --queries 1 --search-budget 4 \
+  --citation-seeds 1 --citation-limit 2 --citation-budget 2 \
+  --effort low --timeout 300 --steps 60 --seconds 1800
+```
+
+`--seconds` applies to this invocation, while acquisition/read settings persist.
+An exhausted budget preserves partial work and does not mark a manuscript ready.
+Resume with an explicit reason and another invocation budget. Human holds,
+withdrawals, missing evidence and critical reviews are never bypassed to force
+completion. Prompt scope summaries keep query/status and reading boundaries;
+full search records remain in the database and exports.
+
+`--queries` limits initial orientation queries. `--search-budget` caps all attempted
+keyword searches, including failed searches, fallback providers, and requests
+from comparisons/reviews/redesigns. Citation traversal has its separate budget.
+Requests beyond the cap stay in their originating artifacts as unresolved work;
+budget limits never turn missing evidence into support.
+
+Fact-labeled blocks with no extracted assertions are retained as incomplete
+coverage, with the verifier's original status and a host adjustment recorded.
+Other validated assertions survive this gate; incomplete coverage still blocks
+completion and creates a major review issue. Contradictory coverage and invalid
+source/manuscript spans remain rejected. Verification contract version 5 makes
+old reports stale for the changed host rule.
+
+Operational resume reasons remain in the audit history but do not change the
+scientific input basis. Use `study guide` to give substantive research direction;
+explicit guidance, claim changes, source changes and human issue decisions still
+invalidate affected artifacts.
+
+Manuscript repair receives the most recent failed repair's validation error only
+when the scientific basis and source draft still match. This lets the author
+correct contract violations without relaxing source requirements. Reports of
+its own workflow use explicitly qualified interpretation blocks, not fabricated
+literature citations. Empirical assertions in any block remain subject to fact
+extraction and review.
+
+## Execution-record verification (contract 6)
+
+`study verify` now extracts two classes of assertions: literature facts (`F` IDs)
+and execution-record assertions (`G` IDs). Both require exact text/qualification
+spans and per-block extraction coverage. A host-created snapshot contains search
+attempts and provider/status, current-question reading pages, document IDs and
+hashes, selected-claim evidence status/relation, and paper inspection scope.
+Search counts include failures and citation traversal; keyword and completed
+counts are separately named. They are study-wide, not a claim of exhaustive
+current-topic coverage. Reading records are filtered to the current question.
+
+For G assertions the model proposes JSON Pointer selectors and typed JSON
+expected values, using equality, membership or a nonempty universal comparison.
+The host calculates supported/contradicted/undetermined from the captured
+records. Unknown paths and inappropriate operations remain undetermined; false
+counts cannot become supported because the model says so. Every result retains
+observed values, exact manuscript offsets and the snapshot SHA-256. The entire
+snapshot remains in the immutable verification artifact and
+`ledger-verification.json` export. No database schema migration is needed.
+
+This verifies consistency with stored activity, not independent confirmation
+that a tool actually performed research, correctness of external publications,
+or completeness of extraction. Mapping natural language to selectors and
+extraction coverage are still model judgments, audited by the separate reviewer
+and human. Internal records cannot substitute for literature evidence.
+Unsupported G assertions and incomplete ledger coverage create blocking major
+review issues even when the reviewer proposes acceptance. Literature facts
+still require immutable document quotations. Old reports remain historical;
+contract 6 verification and contract 4 review must run before finalization.
+
+## Repeated-review handoff
+
+If the same open major/critical issue persists across three distinct reviewed
+manuscripts (initial draft plus two unsuccessful repairs) with the same
+scientific input basis and review contract, the next automatic action is
+`consult`, transitioning to `needs_human`. `study.handoff` records the unresolved
+issue IDs and current draft, verification and review IDs. The draft and all
+failures/reviews remain available; this is not `ready_for_human` or `finalized`.
+Repeated reviews of a single draft do not count as repairs. A new thesis,
+substantive `study guide`, source change or contract change breaks this chain.
+
+Use `study status`, `issue list` and `study export` to inspect the handoff.
+Respond to issues explicitly, supply evidence, or use `study guide` to redesign
+the research before resuming. A bare resume preserves the blocker and does not
+silently discard criticism or grant acceptance.

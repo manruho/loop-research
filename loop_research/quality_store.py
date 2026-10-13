@@ -62,7 +62,8 @@ class QualityStore:
                                 (vid, fact["id"], identifier(source["evidence_id"], "E"),
                                  identifier(source["document_id"], "D"), source["page"], source["start"],
                                  source["end"], source["quote"]))
-        self.event("draft.verified", "AIによる事実主張ごとの暫定検証。人間の確認ではない。",
+        self.event("draft.verified", "文献主張のAI判定と実行記録の機械照合。人間の確認ではない。",
                    {"verification_id": uid, "draft_id": data["draft"]["id"], "facts": len(result["facts"]),
-                    "coverage": result["coverage"]})
+                    "coverage": result["coverage"], "ledger_claims": len(result.get("ledger_claims", [])),
+                    "ledger_snapshot_sha256": result.get("ledger_snapshot_sha256")})
         self._set_study("事実主張を暫定検証。抽出漏れと支持判定は査読・人間確認が必要。", phase="review")

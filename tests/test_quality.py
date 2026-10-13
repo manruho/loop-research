@@ -41,6 +41,52 @@ class QualityAcceptance(unittest.TestCase):
         self.assertEqual(result["state"]["status"], "ready_for_human", result["state"]["reason"])
         return workflow
 
+    def test_prompt_scope_omits_raw_responses_but_preserves_audit(self):
+        sid = self.store.start_search("arxiv", "test", 1, "https://example.invalid")
+        self.store.finish_search(sid, response={"large_payload": "x" * 10000})
+        workflow = ResearchWorkflow(self.store, FixtureEngine())
+        scope = workflow.prompt_scope()
+        self.assertNotIn("response", scope["searches"][0])
+        self.assertEqual(scope["searches"][0]["query"], "test")
+        self.assertIn("large_payload", self.store.show_search("S001")["response"])
+
+    def test_cli_accepts_invocation_time_budget(self):
+        from loop_research.cli import parser
+        for command in (["start", "Narrow question", "--seconds", "120"],
+                        ["study", "run", "--seconds", "120"],
+                        ["study", "resume", "--reason", "Continue", "--seconds", "120"]):
+            self.assertEqual(parser().parse_args(command).seconds, 120)
+
+    def test_acquisition_cap_cannot_be_bypassed_with_unattempted_abstracts(self):
+        workflow = ResearchWorkflow(self.store, FixtureEngine())
+        workflow.perform("orientation")
+        self.store.configure_study("One acquisition", settings={"paper_limit": 1})
+        fake_search(self.store, "synthetic workload", "arxiv", 1)
+        fake_fetch(self.store, "P001")
+        self.store.add_paper({"canonical_key": "synthetic:other", "provider": "synthetic-fixture",
+                              "external_id": "other", "title": "Synthetic other", "url": "https://fixture.invalid/other",
+                              "abstract": "A synthetic abstract."})
+        with patch.object(workflow, "ranked_papers", return_value=[self.store.show_paper("P002")]):
+            choices = workflow.choices()
+        self.assertFalse(any(c["kind"] == "fetch" and c["parameters"]["paper"] == "P002" for c in choices))
+
+    def test_total_search_budget_includes_failures_and_fallback(self):
+        workflow = ResearchWorkflow(self.store, FixtureEngine())
+        workflow.perform("orientation")
+        self.store.configure_study("Cap total searches", settings={"search_budget": 1})
+        query = workflow.pending_queries()[0]
+        sid = self.store.start_search(query["provider"], query["query"], 1, "https://example.invalid")
+        self.store.finish_search(sid, error="Unavailable")
+        self.assertEqual(workflow.pending_queries(), [])
+        self.assertEqual(self.store.show_search("S001")["status"], "failed")
+
+    def test_invalid_time_budgets_do_not_start_tasks(self):
+        workflow = ResearchWorkflow(self.store, FixtureEngine())
+        for value in (0, -1, float("nan"), float("inf"), True):
+            with self.assertRaises(ResearchError):
+                workflow.run(max_seconds=value)
+        self.assertEqual(self.store.list_tasks(), [])
+
     def test_manual_revision_retains_question_but_not_old_assessments(self):
         self.store.configure_study("New topic", question="Changed question")
         claim = self.store.add_claim("Position on changed question")
@@ -236,6 +282,46 @@ class QualityAcceptance(unittest.TestCase):
             workflow.perform("verify")
         self.assertNotEqual(workflow.current_verification()["id"], before["id"])
         self.assertIsNone(workflow.latest_relevant_review())
+
+    def test_failed_draft_repair_returns_validation_feedback_for_same_input(self):
+        workflow = self.full()
+        original = workflow.engine.execute
+        def invalid(kind, data, prompt, schema, on_spawn=None):
+            raw, execution = original(kind, data, prompt, schema, on_spawn)
+            if kind == "revise_draft":
+                raw["sections"][1]["blocks"][0]["evidence_ids"] = []
+            return raw, execution
+        with patch.object(workflow.engine, "execute", side_effect=invalid):
+            with self.assertRaises(ResearchError):
+                workflow.perform("revise_draft")
+        data = workflow.data_for("revise_draft")
+        self.assertIn("validation_feedback", data)
+        self.assertIn("根拠のない事実", data["validation_feedback"]["error"])
+        self.assertIsNotNone(workflow.current_verification())
+
+    def test_operational_resume_preserves_current_scientific_artifacts(self):
+        workflow = self.full()
+        draft = workflow.current_artifact("draft")["id"]
+        verified = workflow.current_verification()["id"]
+        self.store.control_study("needs_human", "Adapter failed")
+        self.store.control_study("active", "Retry without changing research direction", actor="human")
+        self.assertEqual(workflow.current_artifact("draft")["id"], draft)
+        self.assertEqual(workflow.current_verification()["id"], verified)
+
+    def test_unextracted_fact_block_remains_blocking_without_discarding_valid_facts(self):
+        workflow = self.full()
+        data = workflow.data_for("verify")
+        raw, _ = FixtureEngine().execute("verify", data, "", {})
+        block = next(b for b in roles.blocks(data["draft"]["content"]) if b["id"] != raw["facts"][0]["block_id"])
+        block["kind"] = "fact"
+        coverage = next(c for c in raw["coverage"] if c["block_id"] == block["id"])
+        coverage.update(status="no_facts", reason="Process self-report, not a literature assertion")
+        result = verification.normalize(data, raw)
+        item = next(c for c in result["coverage"] if c["block_id"] == block["id"])
+        self.assertEqual(item["status"], "incomplete")
+        self.assertEqual(item["model_status"], "no_facts")
+        self.assertIn(item, verification.blocking(result))
+        self.assertEqual(result["facts"][0]["verdict"], "supported")
 
     def test_mixed_paragraph_facts_and_qualification_have_separate_spans(self):
         workflow = self.full()

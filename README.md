@@ -340,3 +340,15 @@ python3 -m loop_research run abandon R001 --reason "関連プロセスを停止�
 `workflow.py`が研究ループ、`workflow_store.py`が判断と版、`roles.py`が工程契約、`engine.py`がCodex実行、`literature*.py`が資料取得と保存、`export.py`が成果物出力を担当します。実行はLinuxで確認しています。GUIはこの研究操作を利用する形で追加できます。
 
 確認用の架空資料による統合テスト、旧DB移行、引用拒否、重大指摘の再評価、中断と所有プロセスの停止を`tests/`に収録しています。これらはソフトウェアの動作確認で、研究成果の妥当性評価ではありません。
+
+### 実行記録の照合と修正ループの停止
+
+`study verify` は文献の事実主張（F ID）に加え、検索回数・読解ページ・
+根拠の状態などの記述（G ID）を保存済みの実行記録と照合します。
+`study status` に `ledger_verdicts`、エクスポートに
+`ledger-verification.json` が追加されます。記録との一致は、外部文献の
+正しさや研究の網羅性を証明するものではありません。
+
+同じ重大な査読指摘が2回の草稿修正後も残ると、自動修正を止めて
+`needs_human` に移ります。未解決の指摘と草稿・検証・査読のIDを履歴に残します。
+詳しくは [QUALITY.md](QUALITY.md) を参照してください。

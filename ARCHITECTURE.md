@@ -41,3 +41,21 @@ OpenAlex provides keyword discovery and bounded incoming/outgoing citation obser
 Prompt contracts, their versions, model configuration and result provenance are saved. CLI-confirmed models are checked against requested models; absent confirmation remains unconfirmed. Different requested models at the same provider do not guarantee independent errors. Legacy completion judgments are retained in the audit trail but require the new verification/review process before reconfirmation.
 
 `evaluation.py` provides a paired three-case pilot, retained failures, bounded runtime, anonymized human score sheets, validated score imports and reports. Automatic identifier matches and native support judgments are not human quality scores. See QUALITY.md and EVALUATION.md for operation and remaining limits.
+
+### Execution records and repeated-review handoff
+
+`ledger.py` constructs a host-owned, checksummed record snapshot for every new
+verification input. `verification.py` keeps literature facts and ledger claims
+separate: the model extracts exact manuscript spans and record-check expressions,
+while the host compares typed expected values to stored observations. Ledger
+claims and coverage are saved in the immutable U artifact, avoiding a schema
+migration and keeping old artifacts readable. The export includes the snapshot,
+checks, observed values and source-span locations in `ledger-verification.json`.
+Reviewer contract 4 audits extraction and semantic mapping; unsupported record
+claims remain blocking even if model review accepts them.
+
+`ResearchWorkflow.repeated_review_blockers()` identifies the same unresolved
+major/critical issue in consecutive reviews of distinct drafts, under the same
+basis and contract. After two unsuccessful revisions it chooses `consult` and
+records a `study.handoff` event. The status remains `needs_human`; human issue
+responses or substantive research changes are required to make progress.

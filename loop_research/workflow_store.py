@@ -12,7 +12,7 @@ ARTIFACT_PREFIXES = {
 }
 PREFIX_KINDS = {value: key for key, value in ARTIFACT_PREFIXES.items()}
 DEFAULT_SETTINGS = {"provider": "arxiv", "paper_limit": 12, "pages_per_document": 2,
-                    "query_limit": 6, "model": None, "timeout": 180, "reasoning_effort": "medium", "review_model": None, "review_effort": "low",
+                    "query_limit": 6, "search_budget": 12, "model": None, "timeout": 180, "reasoning_effort": "medium", "review_model": None, "review_effort": "low",
                     "citation_seeds": 3, "citation_limit": 10, "citation_budget": 30}
 OWNER_SCHEMA = """
 ALTER TABLE searches ADD COLUMN owner_pid INTEGER;
@@ -121,7 +121,7 @@ class WorkflowStore:
             merged.update(settings)
             if merged["provider"] not in ("arxiv", "crossref", "openalex"):
                 raise ResearchError("検索先が不正です。")
-            for key, maximum in (("paper_limit", 20), ("pages_per_document", 20), ("query_limit", 10), ("citation_seeds", 10), ("citation_limit", 20), ("citation_budget", 100)):
+            for key, maximum in (("paper_limit", 20), ("pages_per_document", 20), ("query_limit", 10), ("search_budget", 100), ("citation_seeds", 10), ("citation_limit", 20), ("citation_budget", 100)):
                 if type(merged[key]) is not int or not (0 if key.startswith("citation_") else 1) <= merged[key] <= maximum:
                     raise ResearchError(f"{key}が有効な範囲にありません。")
             if merged["review_effort"] not in ("low", "medium", "high", "xhigh", "max", "ultra"):
