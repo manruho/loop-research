@@ -167,10 +167,26 @@ class ResearchStore(LiteratureStore, WorkflowStore):
             before = self.claim_row(claim)
             if text == before["text"]:
                 raise ResearchError("主張の内容が同じです。状態変更には claim decide を使ってください。")
+            previous_profile = self.profile(claim) or {}
+            original_question = self.db.execute("SELECT title FROM project").fetchone()[0]
+            # Preserve membership, not the previous revision's substantive assessments.
+            profile = {"kind": previous_profile.get("kind", "unclassified"), "scope": text,
+                       "_question": previous_profile.get("_question", original_question)}
             revision = before["revision"] + 1
             self.db.execute("UPDATE claims SET text=?,revision=?,status='needs_review' WHERE id=?", (text, revision, before["id"]))
             self.db.execute("INSERT INTO revisions VALUES(?,?,?,?,?)", (before["id"], revision, text, reason, now()))
+            self.db.execute("INSERT INTO profiles VALUES(?,?,?,NULL)",
+                            (before["id"], revision, encoded(profile)))
             self.event("claim.revised", reason, {"before": before, "after": self.claim_row(claim)}, claim_id=before["id"])
+            state = self.study_state()
+            if state["selected_claim_id"] == label(before["id"], "C"):
+                changes = {"selected_revision": revision, "phase": "argument"}
+                if state["status"] in ("ready_for_human", "finalized"):
+                    changes["status"] = "active"
+                self._set_study("採用主張が改訂されたため論証と根拠を再確認: " + reason, **changes)
+                self.event("study.revision_followed", reason,
+                           {"claim_id": claim, "revision": revision, "before": state,
+                            "after": self.study_state(), "actor": "human"}, claim_id=before["id"])
         return self.show_claim(claim)
 
     def decide_claim(self, claim, status, reason):
