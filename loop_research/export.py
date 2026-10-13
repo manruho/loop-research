@@ -154,6 +154,11 @@ def export_study(store, output, include_sources=False):
             "manifest.json": None,
             "study.json": json_text(summary), "research-map.json": json_text(graph),
             "claims.json": json_text(claims), "evidence.json": json_text(evidence),
+            "ledger-verification.json": json_text([
+                {"verification_id": a["id"], "snapshot": a["input"].get("ledger_snapshot"),
+                 "claims": a["content"].get("ledger_claims", []),
+                 "coverage": a["content"].get("ledger_coverage", [])}
+                for a in artifacts if a["kind"] == "verify"]),
             "fact-verification.json": json_text([{"artifact": store.show_artifact(v["id"]), "facts": store.verification_rows(v["id"])} for v in store.list_artifacts("verify")]),
             "literature.json": json_text(literature), "artifacts.json": json_text(artifacts),
             "tasks.json": json_text([store.show_task(item["id"]) for item in store.list_tasks()]),

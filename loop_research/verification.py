@@ -1,6 +1,7 @@
 """Fact-level model judgments plus deterministic source/span validation."""
 from .schema import obj, array, string
 from .common import ResearchError
+from . import ledger
 
 TEXT = string(minimum=1)
 INTEGER = {"type": "integer", "minimum": 1, "maximum": 1000}
@@ -12,6 +13,9 @@ VERIFY = obj(
                     reason=TEXT, qualification=string(maximum=2000)), maximum=150),
     coverage=array(obj(block_id=string(minimum=1, maximum=30),
                        status=string(("complete", "no_facts", "incomplete")), reason=TEXT), minimum=1, maximum=88),
+    ledger_claims=array(ledger.CLAIM, maximum=150),
+    ledger_coverage=array(obj(block_id=string(minimum=1, maximum=30),
+                              status=string(("complete", "no_facts", "incomplete")), reason=TEXT), minimum=1, maximum=88),
     limitations=array(TEXT, minimum=1, maximum=12),
 )
 PROMPT = (
@@ -19,8 +23,14 @@ PROMPT = (
     "labeled position or hypothesis when the label hides an asserted empirical claim. Exclude clearly "
     "identified conjectures, normative/value premises, stipulated definitions and analytic/logical "
     "arguments that are not empirical assertions; the reviewer evaluates their reasoning separately. "
-    "Exclude self-reports about this manuscript's search/reading/verification process; the reviewer "
-    "compares those with the supplied host logs rather than requiring a scientific-paper citation. "
+    "Extract factual self-reports about search/reading/evidence status into ledger_claims, not literature facts. "
+    "For each use G001 etc, an exact manuscript substring, and checks against ledger_snapshot.records. "
+    "A check has a JSON Pointer path, operator equals/contains/all_equal and expected_json encoding the "
+    "value asserted by the manuscript (not the observed value). Split compound record assertions. "
+    "Use all_equal only for an explicitly universal statement; contains only for membership. Missing "
+    "record paths remain undetermined. Do not use ledger claims to support scientific findings. "
+    "Report ledger_coverage for EVERY block, including qualification: complete/no_facts/incomplete. "
+    "Do not omit record assertions merely because they are self-reports or labeled interpretation. "
     "Do not demand experiments to establish a normative proposal. Split compound factual assertions; preserve negation, population, numbers and "
     "conditions. fact.text must be an exact contiguous substring of its block; do not paraphrase. "
     "Use F001, F002 etc. field MUST identify text or qualification. Extract factual assertions from "
@@ -58,6 +68,15 @@ def normalize(data, result):
     coverage = result["coverage"]
     if len({c["block_id"] for c in coverage}) != len(coverage) or {c["block_id"] for c in coverage} != set(manuscript):
         raise ResearchError("すべての段落の事実抽出範囲を記録してください。")
+    result["ledger_claims"] = ledger.normalize(data, result["ledger_claims"], manuscript)
+    ledger_coverage = result["ledger_coverage"]
+    if len({c["block_id"] for c in ledger_coverage}) != len(ledger_coverage) or {c["block_id"] for c in ledger_coverage} != set(manuscript):
+        raise ResearchError("すべての段落の実行記録抽出範囲を記録してください。")
+    for item in ledger_coverage:
+        found = any(f["block_id"] == item["block_id"] for f in result["ledger_claims"])
+        if item["status"] == "no_facts" and found:
+            raise ResearchError("実行記録の範囲判定と抽出結果が矛盾しています。")
+    result["ledger_snapshot_sha256"] = data["ledger_snapshot"]["sha256"]
     ids = set()
     for fact in result["facts"]:
         if fact["id"] in ids or fact["block_id"] not in manuscript:
@@ -106,7 +125,7 @@ def normalize(data, result):
         found = any(f["block_id"] == item["block_id"] for f in result["facts"])
         if item["status"] == "no_facts" and found:
             raise ResearchError("事実なしという範囲判定と抽出結果が矛盾しています。")
-        if manuscript[item["block_id"]]["kind"] == "fact" and not found and item["status"] != "incomplete":
+        if manuscript[item["block_id"]]["kind"] == "fact" and not found and not any(f["block_id"] == item["block_id"] for f in result["ledger_claims"]) and item["status"] != "incomplete":
             item["model_status"] = item["status"]
             item["status"] = "incomplete"
             item["host_adjustments"] = ["fact-labeled block has no extracted assertions"]
@@ -115,4 +134,7 @@ def normalize(data, result):
 
 
 def blocking(result):
-    return [f for f in result["facts"] if f["verdict"] != "supported"] + [c for c in result["coverage"] if c["status"] == "incomplete"]
+    return ([f for f in result["facts"] if f["verdict"] != "supported"]
+            + [dict(f, ledger=True) for f in result.get("ledger_claims", []) if f["verdict"] != "supported"]
+            + [c for c in result["coverage"] if c["status"] == "incomplete"]
+            + [dict(c, ledger=True) for c in result.get("ledger_coverage", []) if c["status"] == "incomplete"])

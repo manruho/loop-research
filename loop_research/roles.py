@@ -66,7 +66,7 @@ DRAFT = obj(
 FINDING = obj(
     severity=string(("critical", "major", "minor")),
     category=string(("novelty", "citation", "logic", "counterexample", "scope", "contribution")),
-    target_type=string(("draft", "block", "fact", "claim", "evidence", "paper")),
+    target_type=string(("draft", "block", "fact", "ledger_fact", "claim", "evidence", "paper")),
     target_id=string(minimum=1, maximum=30), explanation=TEXT, evidence_ids=IDS,
     suggested_action=string(("search", "read", "redesign", "revise", "withdraw", "hold")),
     remaining_uncertainty=TEXT,
@@ -268,7 +268,8 @@ def validate_semantics(kind, data, result):
             raise ResearchError("未支持の事実主張や抽出不足を残したまま人間確認へ進めません。")
         targets = {"draft": {data["draft"]["id"]}, "block": {b["id"] for b in blocks(data["draft"]["content"])},
                    "claim": set(claims), "evidence": set(evidences), "paper": set(papers),
-                   "fact": {f["id"] for f in data["verification"]["content"]["facts"]}}
+                   "fact": {f["id"] for f in data["verification"]["content"]["facts"]},
+                   "ledger_fact": {f["id"] for f in data["verification"]["content"].get("ledger_claims", [])}}
         for finding in result["findings"]:
             if finding["target_id"] not in targets[finding["target_type"]]:
                 raise ResearchError("査読の指摘先が入力に存在しません。")
@@ -314,7 +315,7 @@ PROMPT_VERSIONS = {kind: 2 for kind in PROMPTS}
 
 from .verification import PROMPT as VERIFY_PROMPT
 PROMPTS["verify"] = VERIFY_PROMPT
-PROMPT_VERSIONS["verify"] = 5
+PROMPT_VERSIONS["verify"] = 6
 
 PROMPTS["revise_draft"] = (
     "Revise the supplied English manuscript to address the supplied citation/fact verification issues. "
@@ -331,4 +332,6 @@ PROMPTS["revise_draft"] = (
 )
 PROMPT_VERSIONS["revise_draft"] = 2
 
-PROMPT_VERSIONS["review"] = 3
+PROMPT_VERSIONS["review"] = 4
+
+PROMPTS["review"] += " Ledger claims are separately host-checked against ledger_snapshot, not scientific-paper citations. Audit extraction coverage and the mapping from manuscript wording to checks; a passing expression does not prove its interpretation. Target G IDs with ledger_fact. Do not require literature citations for stored execution activity, and do not treat activity records as scientific support."

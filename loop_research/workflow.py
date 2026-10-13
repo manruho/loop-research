@@ -335,6 +335,8 @@ class ResearchWorkflow:
                                   "level": stored["level"], "human_status": stored["status"], "extractor": doc["extractor"],
                                   "linkage": "host-validated evidence_documents mapping and exact page substring",
                                   "source_url": doc["source_url"] if doc["source_url"].startswith(("https://", "http://")) else "local immutable document snapshot"}
+                from . import ledger
+                common["ledger_snapshot"] = ledger.snapshot(self.store, self.scope(), context)
                 common["source_spans"] = spans
                 # Verification needs actual manuscript and source spans, not repeated abstracts/quotes.
                 common["context"] = {"question": context["question"], "claims": context["claims"],
@@ -346,6 +348,7 @@ class ResearchWorkflow:
                 if not verified:
                     raise ResearchError("現行草稿の事実主張検証を先に行ってください。")
                 common["verification"] = {"id": verified["id"], "content": verified["content"]}
+                common["ledger_snapshot"] = verified["input"]["ledger_snapshot"]
                 common["prior_issues"] = self.store.list_issues()
             return common
         if kind == "redesign":
@@ -402,8 +405,8 @@ class ResearchWorkflow:
             else:
                 if kind == "review":
                     for item in verification.blocking(data["verification"]["content"]):
-                        target_type = "fact" if "verdict" in item else "block"
-                        target = item["id"] if target_type == "fact" else item["block_id"]
+                        target_type = ("ledger_fact" if item.get("ledger") else "fact") if "verdict" in item else "block"
+                        target = item["id"] if target_type in ("fact", "ledger_fact") else item["block_id"]
                         if not any(f["severity"] in ("major", "critical") and ((f["target_type"] == target_type and f["target_id"] == target) or (f["target_type"] == "block" and f["target_id"] == item["block_id"])) for f in raw["findings"]):
                             raw["findings"].append({"severity": "major", "category": "citation", "target_type": target_type, "target_id": target,
                                                    "explanation": "Host fact gate: " + item.get("verdict", item.get("status", "")) + ": " + item["reason"],
@@ -573,6 +576,32 @@ class ResearchWorkflow:
                 owned.add(signature)
         return result
 
+    def repeated_review_blockers(self, review):
+        """Two consecutive failed responses to the same major issue trigger handoff."""
+        prior = []
+        for entry in reversed(self.store.list_artifacts("review")):
+            if entry["claim_id"] != review["claim_id"] or entry["claim_revision"] != review["claim_revision"]:
+                continue
+            item = self.store.show_artifact(entry["id"])
+            if (item["input"].get("basis") == review["input"].get("basis")
+                    and item["input"].get("contract_version") == review["input"].get("contract_version")):
+                if not any(r["input"]["draft"]["id"] == item["input"]["draft"]["id"] for r in prior):
+                    prior.append(item)
+            if len(prior) == 3:
+                break
+        if len(prior) < 3 or prior[0]["id"] != review["id"]:
+            return []
+        # Require distinct manuscripts: rerunning review is not an attempted repair.
+        if len({r["input"]["draft"]["id"] for r in prior}) != 3:
+            return []
+        persisted = [{a["issue_id"] for a in r["content"]["prior_issue_assessments"] if a["status"] == "persists"}
+                     for r in prior[:2]]
+        repeated = persisted[0] & persisted[1]
+        return [i for i in self.store.list_issues() if i["id"] in repeated
+                and self.store.show_artifact(i["draft_id"])["input"].get("basis") == review["input"].get("basis")
+                and i["severity"] in ("major", "critical")
+                and i["status"] not in ("addressed", "rejected", "not_applicable")]
+
     def choices(self):
         state = self.store.study_state()
         result = []
@@ -643,6 +672,11 @@ class ResearchWorkflow:
             blocking = [issue for issue in self.store.list_issues(draft_id)
                         if issue["severity"] in ("critical", "major") and issue["status"] not in ("addressed", "rejected", "not_applicable")]
             if blocking or review["content"]["decision"] in ("revise", "hold"):
+                repeated = self.repeated_review_blockers(review)
+                if repeated:
+                    return [{"choice_id": "choice_01", "kind": "consult", "parameters": {"issue_ids": [i["id"] for i in repeated], "review_id": review["id"]},
+                             "reason": "2回の修正後も同じ重大な指摘が残っています。人間の判断が必要: "
+                                       + ", ".join(i["id"] + ": " + i["content"]["explanation"] for i in repeated)}]
                 unlinked = self.unlinked_evidence(selected)
                 if unlinked:
                     add("ground", "新たな原文を主張へ暫定的に結び付け、査読に基づく再設計へ渡す", claim=selected)
@@ -717,6 +751,11 @@ class ResearchWorkflow:
             return fetch_paper(self.store, parameters["paper"], abstract=parameters["abstract"])
         if kind == "ground":
             return self.ground(parameters["claim"])
+        if kind == "consult" and parameters.get("issue_ids"):
+            self.store.event("study.handoff", choice["reason"],
+                             dict(parameters, draft_id=self.current_artifact("draft")["id"],
+                                  verification_id=self.current_verification()["id"] if self.current_verification() else None))
+            self.store.db.commit()
         if kind in ("hold", "consult", "withdraw", "finish"):
             status = {"hold": "held", "consult": "needs_human", "withdraw": "withdrawn", "finish": "ready_for_human"}[kind]
             return self.store.control_study(status, choice["reason"])
@@ -778,6 +817,7 @@ class ResearchWorkflow:
         return {
             "current_verification": verified["id"] if verified else None,
             "fact_verdicts": dict(Counter(f["verdict"] for f in verified["content"]["facts"])) if verified else None,
+            "ledger_verdicts": dict(Counter(f["verdict"] for f in verified["content"].get("ledger_claims", []))) if verified else None,
             "reviewer_independence": "different explicitly requested model; same provider, actual model may be unconfirmed",
             "state": state, "candidates": list(self.candidates().values()),
             "tasks": self.store.list_tasks(), "artifacts": self.store.list_artifacts(),

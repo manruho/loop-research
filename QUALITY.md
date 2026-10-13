@@ -92,3 +92,49 @@ correct contract violations without relaxing source requirements. Reports of
 its own workflow use explicitly qualified interpretation blocks, not fabricated
 literature citations. Empirical assertions in any block remain subject to fact
 extraction and review.
+
+## Execution-record verification (contract 6)
+
+`study verify` now extracts two classes of assertions: literature facts (`F` IDs)
+and execution-record assertions (`G` IDs). Both require exact text/qualification
+spans and per-block extraction coverage. A host-created snapshot contains search
+attempts and provider/status, current-question reading pages, document IDs and
+hashes, selected-claim evidence status/relation, and paper inspection scope.
+Search counts include failures and citation traversal; keyword and completed
+counts are separately named. They are study-wide, not a claim of exhaustive
+current-topic coverage. Reading records are filtered to the current question.
+
+For G assertions the model proposes JSON Pointer selectors and typed JSON
+expected values, using equality, membership or a nonempty universal comparison.
+The host calculates supported/contradicted/undetermined from the captured
+records. Unknown paths and inappropriate operations remain undetermined; false
+counts cannot become supported because the model says so. Every result retains
+observed values, exact manuscript offsets and the snapshot SHA-256. The entire
+snapshot remains in the immutable verification artifact and
+`ledger-verification.json` export. No database schema migration is needed.
+
+This verifies consistency with stored activity, not independent confirmation
+that a tool actually performed research, correctness of external publications,
+or completeness of extraction. Mapping natural language to selectors and
+extraction coverage are still model judgments, audited by the separate reviewer
+and human. Internal records cannot substitute for literature evidence.
+Unsupported G assertions and incomplete ledger coverage create blocking major
+review issues even when the reviewer proposes acceptance. Literature facts
+still require immutable document quotations. Old reports remain historical;
+contract 6 verification and contract 4 review must run before finalization.
+
+## Repeated-review handoff
+
+If the same open major/critical issue persists across three distinct reviewed
+manuscripts (initial draft plus two unsuccessful repairs) with the same
+scientific input basis and review contract, the next automatic action is
+`consult`, transitioning to `needs_human`. `study.handoff` records the unresolved
+issue IDs and current draft, verification and review IDs. The draft and all
+failures/reviews remain available; this is not `ready_for_human` or `finalized`.
+Repeated reviews of a single draft do not count as repairs. A new thesis,
+substantive `study guide`, source change or contract change breaks this chain.
+
+Use `study status`, `issue list` and `study export` to inspect the handoff.
+Respond to issues explicitly, supply evidence, or use `study guide` to redesign
+the research before resuming. A bare resume preserves the blocker and does not
+silently discard criticism or grant acceptance.

@@ -1,0 +1,116 @@
+"""Host-owned record snapshots and deterministic checks of extracted process claims."""
+import hashlib
+import json
+import re
+from .common import ResearchError, label
+from .schema import obj, array, string
+
+CHECK = obj(path=string(minimum=1, maximum=300), operator=string(('equals', 'contains', 'all_equal')),
+            expected_json=string(minimum=1, maximum=2000))
+CLAIM = obj(id=string(minimum=1, maximum=30), block_id=string(minimum=1, maximum=30),
+            field=string(('text', 'qualification')), text=string(minimum=1, maximum=1800),
+            occurrence={'type': 'integer', 'minimum': 1, 'maximum': 1000},
+            checks=array(CHECK, minimum=1, maximum=8), reason=string(minimum=1))
+
+
+def reject_constant(value):
+    raise ValueError("Nonfinite JSON constant: " + value)
+
+
+def canonical(value):
+    return json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(',', ':'), allow_nan=False)
+
+
+def snapshot(store, scope, context):
+    searches = scope['searches']
+    keyword = [s for s in searches if not s['query'].startswith('graph:')]
+    readings = [r for r in scope['readings'] if r['research_question'] == store.study_state()['question']]
+    selected = store.study_state()['selected_claim_id']
+    claim = store.claim_row(selected) if selected else None
+    evidence = list(store.db.execute("SELECT id,status,relation FROM evidence WHERE claim_id=? AND claim_revision=? ORDER BY id",
+                                    (claim['id'], claim['revision']))) if claim else []
+    documents = {d['id']: {'paper_id': p['id'], 'origin': d['origin'], 'sha256': d['sha256'], 'status': d['status']}
+                 for p in store.list_papers() for d in p['documents']}
+    paper_pages = {}
+    for reading in readings:
+        pid = documents[reading['document_id']]['paper_id']
+        paper_pages.setdefault(pid, set()).add(reading['page'])
+    records = {
+        'search_count': len(searches), 'keyword_search_count': len(keyword),
+        'completed_search_count': sum(s['status'] == 'completed' for s in searches),
+        'search_providers': sorted({s['provider'] for s in searches}),
+        'searches': {s['id']: {k: s[k] for k in ('provider', 'query', 'status')} for s in searches},
+        'readings': {r['reading_id']: {k: r[k] for k in ('document_id', 'page', 'start', 'characters')} for r in readings},
+        'evidence_status': {label(e['id'], 'E'): e['status'] for e in evidence},
+        'evidence_relation': {label(e['id'], 'E'): e['relation'] for e in evidence},
+        'paper_scope': {pid: p['seen_scope'] for pid, p in context['papers'].items()},
+        'documents': documents,
+        'paper_read_pages': {pid: sorted(pages) for pid, pages in paper_pages.items()},
+    }
+    return {'records': records, 'sha256': hashlib.sha256(canonical(records).encode()).hexdigest(),
+            'scope': 'Searches are study-wide attempts (including failures and citation traversal); readings belong to the current question; evidence belongs to the selected current claim. Records attest stored activity, not external source truth or exhaustive research.'}
+
+
+def resolve(records, path):
+    if not path.startswith('/') or len(path.split('/')) > 8:
+        raise KeyError(path)
+    current = records
+    for token in path[1:].split('/'):
+        token = token.replace('~1', '/').replace('~0', '~')
+        if isinstance(current, dict) and token in current:
+            current = current[token]
+        elif isinstance(current, list) and re.fullmatch(r'0|[1-9][0-9]*', token) and int(token) < len(current):
+            current = current[int(token)]
+        else:
+            raise KeyError(path)
+    return current
+
+
+def normalize(data, claims, manuscript):
+    from .verification import locate
+    from .common import identifier, label
+    result, ids = [], set()
+    ledger = data['ledger_snapshot']
+    if hashlib.sha256(canonical(ledger['records']).encode()).hexdigest() != ledger['sha256']:
+        raise ResearchError('実行記録スナップショットのハッシュが一致しません。')
+    for raw in claims:
+        item = dict(raw)
+        item['id'] = label(identifier(item['id'], 'G'), 'G')
+        if item['id'] in ids or item['block_id'] not in manuscript:
+            raise ResearchError('実行記録主張のIDまたは対象段落が不正です。')
+        ids.add(item['id'])
+        item['start'], item['end'] = locate(manuscript[item['block_id']][item['field']], item['text'], item['occurrence'])
+        checks = []
+        for raw_check in item['checks']:
+            check = dict(raw_check)
+            try:
+                expected = json.loads(check['expected_json'], parse_constant=reject_constant)
+                canonical(expected)
+            except (ValueError, TypeError, RecursionError) as exc:
+                raise ResearchError('実行記録の期待値は有限のJSON値で指定してください。') from exc
+            try:
+                observed = resolve(ledger['records'], check['path'])
+            except KeyError:
+                check.update(verdict='undetermined', observed=None, reason='Record path unavailable')
+            else:
+                op = check['operator']
+                if op == 'equals':
+                    matches = canonical(observed) == canonical(expected)
+                elif op == 'contains' and isinstance(observed, list):
+                    matches = any(canonical(v) == canonical(expected) for v in observed)
+                elif op == 'all_equal' and isinstance(observed, (dict, list)) and observed:
+                    matches = all(canonical(v) == canonical(expected) for v in (observed.values() if isinstance(observed, dict) else observed))
+                else:
+                    check.update(verdict='undetermined', observed=observed, reason='Unsupported operation or empty collection')
+                    checks.append(check)
+                    continue
+                check.update(verdict='supported' if matches else 'contradicted', observed=observed, reason='Deterministic comparison with stored snapshot')
+            checks.append(check)
+        verdicts = {c['verdict'] for c in checks}
+        item['extraction_reason'] = item['reason']
+        item['reason'] = 'Host ledger checks: ' + '; '.join(c['path'] + ': ' + c['verdict'] for c in checks)
+        item.update(checks=checks, verdict='contradicted' if 'contradicted' in verdicts else 'undetermined' if 'undetermined' in verdicts else 'supported',
+                    snapshot_sha256=ledger['sha256'], host_reason='Host checks extracted expression; its mapping to the manuscript still requires review.',
+                    qualification='Stored records only; not independent confirmation of activity or literature truth.')
+        result.append(item)
+    return result
