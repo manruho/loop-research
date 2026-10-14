@@ -38,12 +38,22 @@ def save(path, value):
 
 def load_cases(path):
     spec = read(path)
-    cases = spec.get("cases", [])
-    if len(cases) != 3 or len({c["id"] for c in cases}) != 3:
-        raise ResearchError("評価には重複しない公開課題3件が必要です。")
+    cases = spec.get('cases', []) if isinstance(spec, dict) else []
+    if not isinstance(cases, list) or not 1 <= len(cases) <= 20 or any(not isinstance(c, dict) for c in cases):
+        raise ResearchError('評価には公開課題1〜20件が必要です。')
     for case in cases:
-        if not re.fullmatch(r"[a-z0-9-]+", case["id"]) or not case["question"].strip():
+        if not isinstance(case.get('id'), str) or not re.fullmatch(r"[a-z0-9-]+", case['id']) or not isinstance(case.get('question'), str) or not case['question'].strip():
             raise ResearchError("評価課題のID・問いが不正です。")
+        seed = case.get('seed', {})
+        if not isinstance(seed, dict) or not isinstance(seed.get('title'), str) or not seed['title'].strip() or not isinstance(seed.get('arxiv'), str) or not re.fullmatch(r'(?:\d{4}\.\d{4,5}|[A-Za-z.-]+/\d{7})(?:v[1-9]\d*)?', seed['arxiv']):
+            raise ResearchError('評価の共通開始資料が不正です。')
+        refs = case.get('references')
+        if not isinstance(refs, list) or any(not isinstance(r, dict) or not isinstance(r.get('id'), str) for r in refs):
+            raise ResearchError('評価の参照集合が不正です。')
+        if len({r['id'] for r in refs}) != len(refs):
+            raise ResearchError('参照集合のIDが重複しています。')
+    if len({c['id'] for c in cases}) != len(cases):
+        raise ResearchError('評価課題のIDが重複しています。')
     return spec
 
 
@@ -154,7 +164,7 @@ def run_evaluation(output, cases_path, model, review_model, seconds=1800, resume
             "created_at": now(), "cases": spec, "cases_sha256": spec_hash, "model": model, "review_model": review_model,
             "seconds_per_run": seconds, "runs": [], "human_evaluation": "pending",
             'methods': methods, 'source_sha256': source_hashes,
-            "limitations": ["3 cases, 1 run per method; no statistical or general superiority claim.",
+            "limitations": [f"{len(spec['cases'])} cases, 1 run per method; no statistical or general superiority claim.",
                              "Different tools and aggregate model usage; model diversity is a confound.",
                              "Reference-set membership and AI extraction are not human ground truth."]}
         if (manifest["model"], manifest["review_model"], manifest["cases_sha256"], manifest["seconds_per_run"]) != (model, review_model, spec_hash, seconds):
@@ -240,7 +250,7 @@ def packet(output, reviewer_model):
             draft = root / run["path"] / "draft.md"
             successful = draft.exists() and run["status"] not in ("failed", "timed_out", "interrupted")
             record_ids = set()
-            if run["method"] == "harness":
+            if run["method"] in VARIANTS:
                 def collect(value):
                     if isinstance(value, dict):
                         for key, item in value.items():

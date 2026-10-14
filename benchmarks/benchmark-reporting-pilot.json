@@ -1,0 +1,83 @@
+{
+  "version": 1,
+  "limitations": "One predeclared task, one run per method. Assistant-curated limited reference set from primary abstracts; not exhaustive literature or independent human relevance truth. The set is withheld from runner prompts; only HELM is seeded.",
+  "protocol": {
+    "seconds_per_run": 600,
+    "model": "gpt-6.1-sol",
+    "review_model": "gpt-6-sol",
+    "methods": [
+      "baseline",
+      "harness",
+      "harness-no-checkpoint"
+    ],
+    "quality_scoring": "Human scoring remains pending. Any assistant/model audit must be separately labelled."
+  },
+  "cases": [
+    {
+      "id": "benchmark-reporting",
+      "question": "Should language-model benchmark reports disclose tested conditions where use should be avoided, alongside aggregate scores? A limited normative reporting proposal, not a claim of measured user benefit or a novel evaluation method.",
+      "seed": {
+        "arxiv": "2211.09110v2",
+        "title": "Holistic Evaluation of Language Models"
+      },
+      "references": [
+        {
+          "id": "arxiv:2211.09110",
+          "url": "https://arxiv.org/abs/2211.09110",
+          "title": "Holistic Evaluation of Language Models",
+          "role": "core",
+          "reason": "Existing scenario and multi-metric evaluation; overlap must be assessed, not treated as evidence for a new disclosure obligation.",
+          "screening_scope": "Primary abstract and metadata inspected; full-text support must be checked separately."
+        },
+        {
+          "id": "arxiv:1810.03993",
+          "url": "https://arxiv.org/abs/1810.03993",
+          "title": "Model Cards for Model Reporting",
+          "role": "core",
+          "reason": "Existing documentation of intended context and performance characteristics; possible prior art for the reporting proposal.",
+          "screening_scope": "Primary abstract and metadata inspected; full-text support must be checked separately."
+        },
+        {
+          "id": "arxiv:2303.18190",
+          "url": "https://arxiv.org/abs/2303.18190",
+          "title": "Assessing Language Model Deployment with Risk Cards",
+          "role": "core",
+          "reason": "Scenario-specific risk documentation; strong overlap candidate, not measured proof of user benefit.",
+          "screening_scope": "Primary abstract and metadata inspected; full-text support must be checked separately."
+        },
+        {
+          "id": "arxiv:2411.12990",
+          "url": "https://arxiv.org/abs/2411.12990",
+          "title": "BetterBench: Assessing AI Benchmarks, Uncovering Issues, and Establishing Best Practices",
+          "role": "core",
+          "reason": "Benchmark quality and reporting practices; compare concrete requirements before claiming novelty.",
+          "screening_scope": "Primary abstract and metadata inspected; full-text support must be checked separately."
+        },
+        {
+          "id": "arxiv:1803.09010",
+          "url": "https://arxiv.org/abs/1803.09010",
+          "title": "Datasheets for Datasets",
+          "role": "core",
+          "reason": "Dataset documentation as related prior art; distinguish dataset, model, benchmark and deployment responsibilities.",
+          "screening_scope": "Primary abstract and metadata inspected; full-text support must be checked separately."
+        },
+        {
+          "id": "arxiv:1802.07810",
+          "url": "https://arxiv.org/abs/1802.07810",
+          "title": "Manipulating and Measuring Model Interpretability",
+          "role": "counter",
+          "reason": "Experimental evidence challenging intuitive benefits of model transparency in its tested setting; not a direct test of benchmark disclosures.",
+          "screening_scope": "Primary abstract and metadata inspected; full-text support must be checked separately."
+        },
+        {
+          "id": "arxiv:2102.09692",
+          "url": "https://arxiv.org/abs/2102.09692",
+          "title": "To Trust or to Think: Cognitive Forcing Functions Can Reduce Overreliance on AI in AI-assisted Decision-making",
+          "role": "counter",
+          "reason": "Conditions and tradeoffs of interventions on reliance; avoid inferring that passive documentation improves decisions.",
+          "screening_scope": "Primary abstract and metadata inspected; full-text support must be checked separately."
+        }
+      ]
+    }
+  ]
+}
