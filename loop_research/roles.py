@@ -315,7 +315,7 @@ PROMPT_VERSIONS = {kind: 2 for kind in PROMPTS}
 
 from .verification import PROMPT as VERIFY_PROMPT
 PROMPTS["verify"] = VERIFY_PROMPT
-PROMPT_VERSIONS["verify"] = 7
+PROMPT_VERSIONS["verify"] = 9
 
 PROMPTS["revise_draft"] = (
     "Revise the supplied English manuscript to address the supplied citation/fact verification issues. "
@@ -330,8 +330,12 @@ PROMPTS["revise_draft"] = (
     "supplied E IDs; the host adds citations. Do not claim that the fix is verified: it will be verified "
     "and reviewed again, including prior unresolved issues."
 )
-PROMPT_VERSIONS["revise_draft"] = 2
+PROMPT_VERSIONS["revise_draft"] = 3
 
-PROMPT_VERSIONS["review"] = 4
+PROMPT_VERSIONS["review"] = 5
 
 PROMPTS["review"] += " Ledger claims are separately host-checked against ledger_snapshot, not scientific-paper citations. Audit extraction coverage and the mapping from manuscript wording to checks; a passing expression does not prove its interpretation. Target G IDs with ledger_fact. Do not require literature citations for stored execution activity, and do not treat activity records as scientific support."
+
+PROMPTS["review"] += " Audit the distinction between epistemic limitations and concrete activity assertions: unresolved novelty or unestablished benefits do not require invented ledger metrics, while claims that actions were not performed require real records. Inspect both text and qualifications for metadata-only paper IDs, evidence status/relation, and every reading/document-to-paper mapping. Do not accept a broad claim merely because one subset of its checks passes."
+
+PROMPTS["revise_draft"] += " If a past action cannot be checked from recorded activity, remove the unnecessary action claim or explicitly state that its execution is unconfirmed; do not invent an E citation or relabel an asserted fact to evade verification. Epistemic limitations may remain as honest limitations without claiming that an action was performed."

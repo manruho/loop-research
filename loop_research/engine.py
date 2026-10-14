@@ -44,6 +44,28 @@ def guard_parent(parent_pid):
         os._exit(1)
 
 
+def tool_observation(events):
+    """Count observable tool items without saving commands or reasoning text."""
+    tools = {"command_execution", "mcp_tool_call", "web_search", "file_change"}
+    non_tools = {"agent_message", "reasoning", "todo_list", "error"}
+    seen, unknown = set(), set()
+    item_events = 0
+    for index, event in enumerate(events):
+        if event.get("type") not in ("item.started", "item.completed"):
+            continue
+        item_events += 1
+        item = event.get("item", {})
+        kind = item.get("type") if isinstance(item, dict) else None
+        if kind in tools:
+            seen.add(item.get("id") or f"event:{index}")
+        elif kind not in non_tools:
+            unknown.add(str(kind))
+    if not item_events:
+        unknown.add("item_event_inventory_unavailable")
+    return {"known_tool_items": len(seen), "unknown_item_types": sorted(unknown),
+            "scope": "CLI-reported item events only; not independent activity confirmation"}
+
+
 class CodexEngine:
     def __init__(self, model=None, timeout=180, reasoning_effort="medium"):
         validate_review_options(timeout, model)
@@ -143,6 +165,7 @@ class CodexEngine:
                     "model_confirmation": "CLI-reported" if any(isinstance(e.get("model"), str) for e in events) else "unconfirmed",
                     "independence_scope": "different requested model, same provider; shared errors remain possible",
                     "thread_id": next((e.get("thread_id") for e in events if e.get("type") == "thread.started"), None),
+                    "tool_observation": tool_observation(events),
                     "usage": next((e.get("usage") for e in reversed(events) if e.get("type") == "turn.completed"), None),
                 }
                 if execution["resolved_model"] and self.model and execution["resolved_model"] != self.model:

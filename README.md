@@ -352,3 +352,7 @@ python3 -m loop_research run abandon R001 --reason "関連プロセスを停止�
 同じ重大な査読指摘が2回の草稿修正後も残ると、自動修正を止めて
 `needs_human` に移ります。未解決の指摘と草稿・検証・査読のIDを履歴に残します。
 詳しくは [QUALITY.md](QUALITY.md) を参照してください。
+
+分類の回帰評価は `research eval extraction --model gpt-6-astra --output .research/extraction-eval`
+で実行できます。開発者が作成した短い評価例への一致を測るもので、
+人間による独立評価や論文全体の抽出精度の証明ではありません。

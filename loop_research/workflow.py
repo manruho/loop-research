@@ -336,7 +336,7 @@ class ResearchWorkflow:
                                   "linkage": "host-validated evidence_documents mapping and exact page substring",
                                   "source_url": doc["source_url"] if doc["source_url"].startswith(("https://", "http://")) else "local immutable document snapshot"}
                 from . import ledger
-                common["ledger_snapshot"] = ledger.snapshot(self.store, self.scope(), context)
+                common["ledger_snapshot"] = ledger.snapshot(self.store, self.scope(), context, draft=draft)
                 common["source_spans"] = spans
                 # Verification needs actual manuscript and source spans, not repeated abstracts/quotes.
                 common["context"] = {"question": context["question"], "claims": context["claims"],
@@ -680,7 +680,7 @@ class ResearchWorkflow:
                 unlinked = self.unlinked_evidence(selected)
                 if unlinked:
                     add("ground", "新たな原文を主張へ暫定的に結び付け、査読に基づく再設計へ渡す", claim=selected)
-                if blocking and all(issue["content"]["category"] == "citation" for issue in blocking) and review["content"]["decision"] == "revise" and self.current_artifact("outline"):
+                if blocking and all(issue["content"]["category"] == "citation" or issue["content"]["target_type"] == "ledger_fact" for issue in blocking) and review["content"]["decision"] == "revise" and self.current_artifact("outline"):
                     add("revise_draft", "引用・事実の問題を草稿で修正し、中心主張は保持して再検証する")
                 else:
                     add("redesign", "重大な査読指摘へ応答し、再調査・主張の限定・撤回を選ぶ")

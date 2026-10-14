@@ -106,3 +106,30 @@ That saved extraction was explicitly revalidated under identical scientific
 inputs, followed by a fresh model review. Raw failed outputs, replay provenance
 and the original study remain preserved privately. Code changed during the
 recheck; this is diagnostic evidence, not a fixed-release evaluation.
+
+## Extraction precision and repaired manuscript (2026-10-13)
+
+The developmental follow-up reached `ready_for_human` for manuscript A022,
+keeping the selected thesis at revision 1. The latest fresh verification
+contains 22 AI-supported literature assertions and 26 ledger assertions matched
+to the recorded snapshot. Fresh review checked text and qualifications and
+found the earlier activity overclaims and ledger omissions repaired. This is
+internal review readiness, not human approval, source authenticity, proven
+novelty/effectiveness or publication suitability.
+
+The work added explicit classification boundaries and coverage checklists,
+guarded web-search settings from being used as proof of tool non-use, and
+routed ledger-only findings to manuscript repair. The original database and
+all developmental attempts remain preserved privately. A first copy exposed
+an unnecessary thesis-redesign route; a second copy restored the original
+manuscript, explicitly revalidated saved extraction under identical scientific
+inputs, then freshly reviewed, rewrote, verified and reviewed the replacement.
+Code changed during the work; this remains diagnostic evidence, not a
+fixed-version comparative experiment or a superiority result.
+
+The classification regression had 11/11 matches with descriptive IDs, 10/11
+with neutral IDs, and 11/11 after revising an ambiguous isolated-pronoun example
+to explicitly attribute the statement to its evidence ledger. Neutral IDs and
+withheld expected labels are now used. All attempts and case hashes are saved.
+These eleven developer-annotated cases are not independent human ground truth
+or a measurement of full-manuscript recall.

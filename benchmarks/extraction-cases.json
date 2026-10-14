@@ -1,0 +1,109 @@
+{
+  "version": 2,
+  "annotation": "Developer-authored regression expectations, not human-reviewed gold truth or independent quality scores.",
+  "cases": [
+    {
+      "id": "uncertain-novelty",
+      "text": "Novelty remains unresolved.",
+      "expected_class": "uncertainty",
+      "expected_checks": []
+    },
+    {
+      "id": "uncertain-effect",
+      "text": "The supplied comparison cannot establish an independent display effect.",
+      "expected_class": "uncertainty",
+      "expected_checks": []
+    },
+    {
+      "id": "normative-proposal",
+      "text": "Reports should distinguish unverified claims from withdrawn claims.",
+      "expected_class": "normative",
+      "expected_checks": []
+    },
+    {
+      "id": "future-evaluation",
+      "text": "A future evaluation could test whether labels reduce reader confusion.",
+      "expected_class": "hypothesis",
+      "expected_checks": []
+    },
+    {
+      "id": "search-count",
+      "text": "The ledger lists six searches.",
+      "expected_class": "ledger",
+      "expected_checks": [
+        {
+          "path": "/search_count",
+          "operator": "equals",
+          "expected_json": "6"
+        }
+      ]
+    },
+    {
+      "id": "metadata-only",
+      "text": "P003 is designated metadata-only.",
+      "expected_class": "ledger",
+      "expected_checks": [
+        {
+          "path": "/paper_scope/P003",
+          "operator": "equals",
+          "expected_json": "\"metadata\""
+        }
+      ]
+    },
+    {
+      "id": "unchecked-evidence",
+      "text": "Every recorded evidence item is unchecked.",
+      "expected_class": "ledger",
+      "expected_checks": [
+        {
+          "path": "/evidence_status",
+          "operator": "all_equal",
+          "expected_json": "\"unchecked\""
+        }
+      ]
+    },
+    {
+      "id": "unassessed-relation",
+      "text": "The evidence ledger records E001's relationship to the selected claim as unassessed.",
+      "expected_class": "ledger",
+      "expected_checks": [
+        {
+          "path": "/evidence_relation/E001",
+          "operator": "equals",
+          "expected_json": "\"unassessed\""
+        }
+      ]
+    },
+    {
+      "id": "specific-page",
+      "text": "The reading ledger lists P001 page 58.",
+      "expected_class": "ledger",
+      "expected_checks": [
+        {
+          "path": "/paper_read_pages/P001",
+          "operator": "contains",
+          "expected_json": "58"
+        }
+      ]
+    },
+    {
+      "id": "negative-action",
+      "text": "The author performed no tool calls.",
+      "expected_class": "ledger",
+      "expected_checks": [
+        {
+          "path": "/author_tool_call_count",
+          "operator": "equals",
+          "expected_json": "0"
+        }
+      ]
+    },
+    {
+      "id": "study-result",
+      "text": "The cited study reports a higher error rate in the treatment group.",
+      "expected_class": "literature",
+      "expected_checks": []
+    }
+  ],
+  "revision_note": "The original isolated pronoun in unassessed-relation was ambiguous; revised to name its evidence-ledger attribution. Prior attempts remain recorded under their case hashes."
+}

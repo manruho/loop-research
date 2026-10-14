@@ -145,3 +145,38 @@ or nonfinite expected JSON values remain `undetermined` with their original
 text and diagnostic retained, without discarding valid assertions. Exact
 manuscript/source mismatches and corrupted snapshot hashes still reject the
 result. Missing record fields cannot establish a negative assertion.
+
+## Extraction precision (verification 9 / review 5)
+
+Concrete activity claims must be distinguished from epistemic limitations:
+"novelty remains unresolved" and "benefits are not established" do not assert
+that a recorded action occurred. Claims about what a cited study tested remain
+literature assertions. Real claims that the author used no tools or performed
+no searches require activity records and remain undetermined if absent.
+Verification/review prompts explicitly inspect both manuscript fields, metadata
+paper IDs, evidence status/relation and each reading/document-to-paper mapping.
+Long compound ledger claims must be split instead of truncating eight checks.
+
+The snapshot can attest whether the stored author input included raw search
+responses. New CLI executions save a summary of observable tool-item events
+without commands or reasoning text. Unknown event types are recorded, and no
+historical zero-tool count is inferred when that telemetry is missing. These
+are recorded observations, not independent confirmation of external activity.
+
+A small developer-authored regression set is available through:
+
+```bash
+research eval extraction --model gpt-6-astra --output .research/extraction-eval
+```
+
+Expected labels are hidden from the model, which sees neutral case IDs. Results
+are compared with developer annotations and all attempts are retained. This
+measures classification on eleven known regression cases, not full-manuscript
+extraction recall, independent human ground truth or superiority over Codex.
+
+Host contract 9 additionally prevents a matching web-search configuration from
+establishing tool non-use or exclusive source use. This is a conservative guard
+for the observed failure, not a general natural-language entailment prover;
+semantic mappings still require review. Ledger-only major findings route to
+manuscript repair even when categorized as scope/logic, preserving the thesis.
+A stream without item-event inventory does not provide a zero-tool assertion.
