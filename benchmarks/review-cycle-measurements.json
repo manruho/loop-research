@@ -1,0 +1,180 @@
+{
+  "protocol": "Sequential diagnostic continuations; each attempt reuses previous evidence. Not a controlled before/after comparison. Stop after the first accepted review of a new draft.",
+  "human_evaluation": "pending",
+  "approved": false,
+  "attempts": [
+    {
+      "attempt": 1,
+      "implementation_commit": "2fcbcb0",
+      "budget_seconds": 1200,
+      "elapsed_seconds": 780.2759146030294,
+      "status": "budget_exhausted",
+      "reason": "検証・査読の予約時間を維持する工程上限に達しました。T030: Codex作業が制限時間を超えました。",
+      "phase_metrics": {
+        "phases": {
+          "verify": {
+            "calls": 1,
+            "seconds": 51.0,
+            "failed": 0
+          },
+          "review": {
+            "calls": 1,
+            "seconds": 52.0,
+            "failed": 0
+          },
+          "redesign": {
+            "calls": 6,
+            "seconds": 330.0,
+            "failed": 1
+          },
+          "selection": {
+            "calls": 6,
+            "seconds": 176.0,
+            "failed": 0
+          },
+          "reading": {
+            "calls": 5,
+            "seconds": 163.0,
+            "failed": 0
+          }
+        },
+        "seconds_to_first_draft": null,
+        "calls_to_first_draft": null,
+        "reported_usage": {
+          "cache_write_input_tokens": 0,
+          "cached_input_tokens": 22272,
+          "input_tokens": 442905,
+          "output_tokens": 26078,
+          "reasoning_output_tokens": 1649
+        },
+        "usage_unavailable_calls": 1,
+        "notice": "CLI-reported tokens; missing usage is unknown, not zero. No inference compute estimate."
+      },
+      "initial_draft": "A008",
+      "current_draft": null,
+      "selected_revision": 1,
+      "fact_verdicts": null,
+      "ledger_verdicts": null,
+      "one_cycle_stop": false,
+      "source_unchanged": true,
+      "original_database_unchanged": true,
+      "review_decisions": [
+        "revise"
+      ],
+      "new_reading_count": 5
+    },
+    {
+      "attempt": 2,
+      "implementation_commit": "004f483",
+      "budget_seconds": 900,
+      "elapsed_seconds": 56.66591966699343,
+      "status": "needs_human",
+      "reason": "T033: 作業の入力が大きすぎます。対象文献・根拠を絞ってください。",
+      "phase_metrics": {
+        "phases": {
+          "selection": {
+            "calls": 1,
+            "seconds": 33.0,
+            "failed": 0
+          },
+          "reading": {
+            "calls": 1,
+            "seconds": 21.0,
+            "failed": 0
+          },
+          "redesign": {
+            "calls": 1,
+            "seconds": 0.0,
+            "failed": 1
+          }
+        },
+        "seconds_to_first_draft": null,
+        "calls_to_first_draft": null,
+        "reported_usage": {
+          "cache_write_input_tokens": 0,
+          "cached_input_tokens": 0,
+          "input_tokens": 30309,
+          "output_tokens": 1392,
+          "reasoning_output_tokens": 278
+        },
+        "usage_unavailable_calls": 1,
+        "notice": "CLI-reported tokens; missing usage is unknown, not zero. No inference compute estimate."
+      },
+      "initial_draft": "A008",
+      "current_draft": null,
+      "selected_revision": 1,
+      "fact_verdicts": null,
+      "ledger_verdicts": null,
+      "one_cycle_stop": false,
+      "source_unchanged": true,
+      "original_database_unchanged": true,
+      "review_decisions": [],
+      "new_reading_count": 1
+    },
+    {
+      "attempt": 3,
+      "implementation_commit": "9e6d208",
+      "budget_seconds": 900,
+      "elapsed_seconds": 274.1076495649759,
+      "status": "budget_exhausted",
+      "reason": "Predeclared one-cycle diagnostic limit: new draft reviewed; unresolved issues remain for future research.",
+      "phase_metrics": {
+        "phases": {
+          "redesign": {
+            "calls": 1,
+            "seconds": 67.0,
+            "failed": 0
+          },
+          "outline": {
+            "calls": 1,
+            "seconds": 31.0,
+            "failed": 0
+          },
+          "draft": {
+            "calls": 1,
+            "seconds": 48.0,
+            "failed": 0
+          },
+          "verify": {
+            "calls": 1,
+            "seconds": 80.0,
+            "failed": 0
+          },
+          "review": {
+            "calls": 1,
+            "seconds": 47.0,
+            "failed": 0
+          }
+        },
+        "seconds_to_first_draft": 146.0,
+        "calls_to_first_draft": 3,
+        "reported_usage": {
+          "cache_write_input_tokens": 0,
+          "cached_input_tokens": 11520,
+          "input_tokens": 203358,
+          "output_tokens": 14210,
+          "reasoning_output_tokens": 494
+        },
+        "usage_unavailable_calls": 0,
+        "notice": "CLI-reported tokens; missing usage is unknown, not zero. No inference compute estimate."
+      },
+      "initial_draft": "A008",
+      "current_draft": "A033",
+      "selected_revision": 2,
+      "fact_verdicts": {
+        "supported": 9,
+        "partial": 2
+      },
+      "ledger_verdicts": {
+        "supported": 18
+      },
+      "one_cycle_stop": true,
+      "source_unchanged": true,
+      "original_database_unchanged": true,
+      "review_decisions": [
+        "revise"
+      ],
+      "new_reading_count": 0
+    }
+  ]
+}
