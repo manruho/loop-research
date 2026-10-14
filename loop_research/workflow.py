@@ -10,7 +10,7 @@ import sqlite3
 import sys
 import time
 
-from . import roles, verification
+from . import roles, verification, budget
 from .common import ResearchError, identifier, label, now
 from .engine import CodexEngine, EngineFailure, process_alive
 from .literature import fetch_paper, search_papers
@@ -64,6 +64,7 @@ class ResearchWorkflow:
         self.store = store
         state = store.study_state()
         self.deadline = None
+        self.run_seconds = None
         self.injected_engine = engine is not None
         self.engine = engine or CodexEngine(state["settings"]["model"], state["settings"]["timeout"],
                                            state["settings"]["reasoning_effort"])
@@ -80,11 +81,16 @@ class ResearchWorkflow:
         reviewer = kind in ("review", "verify")
         timeout = settings["timeout"]
         if self.deadline is not None:
-            timeout = min(timeout, self.deadline - time.monotonic())
+            remaining = self.deadline - time.monotonic()
+            timeout = (budget.allocation(kind, self.run_seconds, remaining, timeout)['timeout_seconds']
+                       if self.run_seconds is not None else min(timeout, remaining))
             if timeout <= 0:
                 raise ResearchError("今回の実行時間上限に達しました。")
         return CodexEngine(settings["review_model"] if reviewer else settings["model"], timeout,
                            settings["review_effort"] if reviewer else settings["reasoning_effort"])
+
+    def prompt_for(self, kind):
+        return budget.prompt(kind, roles.PROMPTS[kind]) if self.run_seconds is not None else roles.PROMPTS[kind]
 
     def current_verification(self):
         draft = self.current_artifact("draft")
@@ -407,7 +413,7 @@ class ResearchWorkflow:
             self.store.db.rollback()
             raise
         config = self.engine_for(kind).config
-        key = digest({"kind": kind, "data": data, "prompt": roles.PROMPTS[kind], "schema": SCHEMAS[kind],
+        key = digest({"kind": kind, "data": data, "prompt": self.prompt_for(kind), "schema": SCHEMAS[kind],
                       "prompt_version": roles.PROMPT_VERSIONS[kind], "model": config.get("model"),
                       "reasoning_effort": config.get("reasoning_effort")})
         return data, key, fingerprint
@@ -421,15 +427,19 @@ class ResearchWorkflow:
             if row:
                 return self.store.show_task(label(row[0], "T"))
         engine = self.engine_for(kind)
-        task = self.store.start_task(kind, key, data, roles.PROMPTS[kind], SCHEMAS[kind],
-                                     dict(engine.config, prompt_version=roles.PROMPT_VERSIONS[kind]), fingerprint)
+        config = dict(engine.config, prompt_version=roles.PROMPT_VERSIONS[kind])
+        if self.run_seconds is not None:
+            config['run_budget'] = budget.allocation(kind, self.run_seconds, self.deadline - time.monotonic(),
+                                                    self.store.study_state()['settings']['timeout'])
+        prompt = self.prompt_for(kind)
+        task = self.store.start_task(kind, key, data, prompt, SCHEMAS[kind], config, fingerprint)
         task_id = task["id"]
         print(f"{task_id}: {kind}を実行しています…", file=sys.stderr, flush=True)
         raw = None
         execution = None
         try:
             raw, execution = engine.execute(
-                kind, data, roles.PROMPTS[kind], SCHEMAS[kind],
+                kind, data, prompt, SCHEMAS[kind],
                 on_spawn=lambda pid, identity: self.store.task_process(task_id, pid, identity),
             )
             validate(raw, SCHEMAS[kind])
@@ -515,7 +525,8 @@ class ResearchWorkflow:
 
     def cached_selection(self, document=None):
         data = self.data_for('selection', document=document)
-        config = self.engine_for('selection').config
+        settings = self.store.study_state()['settings']
+        config = self.engine.config if self.injected_engine else settings
         key = digest({'kind': 'selection', 'data': data, 'prompt': roles.PROMPTS['selection'],
                       'schema': SCHEMAS['selection'], 'prompt_version': roles.PROMPT_VERSIONS['selection'],
                       'model': config.get('model'), 'reasoning_effort': config.get('reasoning_effort')})
@@ -677,6 +688,17 @@ class ResearchWorkflow:
         def add(kind, reason, **parameters):
             result.append({"choice_id": f"choice_{len(result)+1:02d}", "kind": kind,
                            "parameters": parameters, "reason": reason})
+        cid = state['selected_claim_id']
+        if self.run_seconds is not None and cid and self.store.claim_row(cid)['status'] not in ('held', 'withdrawn'):
+            draft = self.current_artifact('draft')
+            if draft:
+                if not self.current_verification():
+                    add('verify', '時間予算内で現行草稿の事実検証を追加探索より先に実行する')
+                    return result
+                review = self.latest_relevant_review()
+                if not review or review['input']['draft']['id'] != draft['id']:
+                    add('review', '検証済み草稿の独立した査読を追加探索より先に実行する')
+                    return result
         if not self.orientation():
             add("orientation", "問いと隣接領域・競合する立場の探索方針を整理する")
             return result
@@ -930,6 +952,14 @@ class ResearchWorkflow:
         if max_seconds is not None and (not isinstance(max_seconds, (int, float)) or isinstance(max_seconds, bool) or not 0 < max_seconds < float("inf")):
             raise ResearchError("実行時間上限は有限の正数で指定してください。")
         self.deadline = time.monotonic() + max_seconds if max_seconds is not None else None
+        self.run_seconds = max_seconds
+        try:
+            return self._run(steps, resume_reason)
+        finally:
+            self.deadline = None
+            self.run_seconds = None
+
+    def _run(self, steps, resume_reason):
         if type(steps) is not int or not 1 <= steps <= 1000:
             raise ResearchError("作業上限は1〜1000で指定してください。")
         with study_lock(self.store), termination_as_interrupt():
@@ -960,6 +990,19 @@ class ResearchWorkflow:
                         break
                     if self.store.study_state()["status"] != "active":
                         break
+                    # Stop before starting work that would consume the protected tail.
+                    # A fresh run/resume gets a fresh envelope; saved artifacts remain valid.
+                    if self.run_seconds is not None:
+                        selected = self.store.study_state()['selected_claim_id']
+                        if selected and self.store.claim_row(selected)['status'] in ('held', 'withdrawn'):
+                            selected = None
+                        kind = ('review' if selected and self.current_verification() else
+                                'verify' if selected and self.current_artifact('draft') else 'draft')
+                        plan = budget.allocation(kind, self.run_seconds, self.deadline - time.monotonic(),
+                                                 self.store.study_state()['settings']['timeout'])
+                        if plan['timeout_seconds'] <= 0:
+                            self.store.control_study('budget_exhausted', '検証・査読用の時間を確保したため、未完了の前工程を停止しました。再開には新たな予算が必要です。')
+                            break
                     choices = self.choices()
                     if not choices:
                         self.store.control_study("needs_human", "次の有効な作業を特定できません。")
@@ -997,7 +1040,12 @@ class ResearchWorkflow:
                     status = "interrupted" if isinstance(exc, KeyboardInterrupt) or getattr(exc, "status", None) == "interrupted" else "needs_human"
                     if self.deadline is not None and time.monotonic() >= self.deadline and not isinstance(exc, KeyboardInterrupt):
                         status = "budget_exhausted"
-                    self.store.control_study(status, str(exc) or "人間が研究を中断")
+                    elif self.run_seconds is not None and getattr(exc, 'status', None) == 'timed_out':
+                        status = 'budget_exhausted'
+                    reason = str(exc) or "人間が研究を中断"
+                    if status == 'budget_exhausted' and self.deadline is not None and time.monotonic() < self.deadline:
+                        reason = '検証・査読の予約時間を維持する工程上限に達しました。' + reason
+                    self.store.control_study(status, reason)
             except (ResearchError, OSError, sqlite3.Error) as exc:
                 if self.store.study_state()["status"] == "active":
                     self.store.control_study("needs_human", str(exc))
