@@ -74,3 +74,10 @@ PDF and build log join the same atomically published export and manifest hash
 inventory. Export format 2 adds PDF build metadata; existing JSON evidence and
 research-state semantics are preserved. Editing rendered TeX does not update
 or validate the authoritative research ledger.
+
+
+## 草稿の台帳事実と探索候補
+
+`ledger_fact`は内部活動の事実を表す段落種別であり、科学的支持を与えない。草稿入力にホストが生成した台帳スナップショットを保存し、検証で原稿の部分文字列からG主張、record path、比較値、SHAへの対応を作る。ledger_factにG抽出がなければホストが抽出範囲をincompleteへ変更する。従来のfactは文献引用必須を維持する。手動草稿インポートも同じ台帳入力と検証条件を使う。draft/revise_draft/verify契約版を更新し、旧タスクのキャッシュ・旧検証判断を再利用しない。
+
+文献ランキングの語彙選別は取得上限の配分にだけ使う。DBの候補・資料を削除せず、科学的根拠の採否や新規性を決めるものではない。手動登録はこの選別を通さず、人間の探索方針を維持する。引用探索も同じ候補集合からseedを選び、手動seedを優先する。OpenAlexへの対応付けはDOIまたは正確なarXiv所在識別子に基づき、タイトルだけの自動統合を禁止する。

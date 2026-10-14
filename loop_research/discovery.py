@@ -91,17 +91,51 @@ def resolve(store, paper):
     elif row["provider"] == "openalex":
         work = request(BASE + "/" + row["external_id"])
     elif row["doi"]:
-        work = request(BASE + "/" + urllib.parse.quote("https://doi.org/" + row["doi"], safe=""))
+        work = request(BASE + "/doi:" + urllib.parse.quote(row["doi"], safe="/"))
     elif row["external_id"] and re.fullmatch(r"(?:\d{4}\.\d{4,5}|[a-zA-Z.-]+/\d{7})(?:v[1-9]\d*)?", row["external_id"]):
         base_id = re.sub(r"v[0-9]+$", "", row["external_id"])
-        work = request(BASE + "/" + urllib.parse.quote("https://doi.org/10.48550/arXiv." + base_id, safe=""))
+        # A repository identifier is not necessarily indexed as a DOI. Search is
+        # only a candidate lookup: exact repository identity must be in locations.
+        response = request(BASE + "?" + urllib.parse.urlencode({"search": row["title"], "per_page": 5}))
+        candidates = []
+        for candidate in response.get("results", []):
+            if not isinstance(candidate, dict):
+                continue
+            locations = candidate.get("locations") or []
+            if not isinstance(locations, list):
+                continue
+            for location in locations:
+                if not isinstance(location, dict):
+                    continue
+                urls = [location.get("landing_page_url"), location.get("pdf_url")]
+                if any(arxiv_identity(url) == base_id for url in urls):
+                    candidates.append(candidate)
+                    break
+        matches = {candidate.get("id"): candidate for candidate in candidates}
+        if len(matches) != 1:
+            raise ResearchError("OpenAlexでarXiv識別子に一致する文献を一意に確認できません。タイトル類似だけでは統合しません。")
+        work = next(iter(matches.values()))
     else:
         # No fuzzy title merge. User can supply an exact OpenAlex ID via paper add.
         raise ResearchError("引用探索にはDOIまたはOpenAlex IDが必要です。タイトル類似で自動統合しません。")
     parsed = parse_work(work)
-    if row["doi"] and parsed["doi"].lower() != row["doi"].lower():
+    known_dois = {parsed["doi"].lower()}
+    for location in work.get("locations") or []:
+        if isinstance(location, dict) and isinstance(location.get("doi"), str):
+            known_dois.add(location["doi"].removeprefix("https://doi.org/").removeprefix("http://doi.org/").lower())
+    if row["doi"] and row["doi"].lower() not in known_dois:
         raise ResearchError("OpenAlexの識別子が登録文献と一致しません。")
     return work
+
+
+def arxiv_identity(url):
+    if not isinstance(url, str):
+        return None
+    parsed = urllib.parse.urlsplit(url)
+    if parsed.scheme not in ("http", "https") or parsed.hostname not in ("arxiv.org", "www.arxiv.org", "export.arxiv.org"):
+        return None
+    match = re.fullmatch(r"/(?:abs|pdf)/((?:\d{4}\.\d{4,5}|[a-zA-Z.-]+/\d{7}))(?:v[1-9]\d*)?(?:\.pdf)?", parsed.path)
+    return match[1] if match else None
 
 
 def related_papers(store, paper, direction="both", limit=10, remaining=30):
