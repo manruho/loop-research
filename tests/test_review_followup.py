@@ -222,3 +222,23 @@ class ReviewFollowup(unittest.TestCase):
         self.assertEqual(choices[0]['parameters'], {'document': 'D002', 'page': 1})
         self.assertEqual(self.store.list_issues()[0]['status'], 'investigating')
         self.assertEqual(self.workflow.plan_progress(plan)['readings'], [])
+
+    def test_redesign_input_deduplicates_only_identical_anchor_copies(self):
+        before = self.workflow.context()
+        rows = self.store.db.execute('SELECT COUNT(*) FROM evidence').fetchone()[0]
+        after = self.workflow.data_for('redesign')['context']
+        self.assertLess(len(json.dumps(after)), len(json.dumps(before)))
+        for old, kept in after['omitted_anchor_evidence'].items():
+            self.assertEqual(before['evidence'][old]['excerpt_id'], after['evidence'][kept]['excerpt_id'])
+            self.assertEqual(before['evidence'][old]['document_source'], after['evidence'][kept]['document_source'])
+            self.assertEqual(before['evidence'][old]['status'], after['evidence'][kept]['status'])
+            self.assertEqual(after['evidence'][kept]['claim_id'], self.workflow.selected())
+            self.assertEqual(after['evidence'][kept]['anchor_interpretations'][old], before['evidence'][old]['interpretation'])
+            self.assertIsNotNone(self.store.show_evidence(old))
+        self.assertEqual(rows, self.store.db.execute('SELECT COUNT(*) FROM evidence').fetchone()[0])
+
+    def test_distinct_human_status_is_not_deduplicated(self):
+        self.store.assess_evidence('E001', 'checked', 'Explicit synthetic fixture confirmation')
+        context = self.workflow.context(deduplicate_anchor=True)
+        self.assertIn('E001', context['evidence'])
+        self.assertEqual(context['evidence']['E001']['status'], 'checked')

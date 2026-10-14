@@ -180,7 +180,7 @@ class ResearchWorkflow:
             "omitted_from_prompt": "Raw search responses remain in the study database and export.",
         }
 
-    def context(self, only_claim=None, for_comparison=False):
+    def context(self, only_claim=None, for_comparison=False, deduplicate_anchor=False):
         state = self.store.study_state()
         if only_claim:
             row = self.store.claim_row(only_claim)
@@ -225,9 +225,31 @@ class ResearchWorkflow:
                 "documents": [{"id": doc["id"], "origin": doc["origin"], "status": doc["status"],
                                "sha256": doc["sha256"]} for doc in item["documents"]],
             }
-        return {"question": state["question"], "audience": state["audience"], "venue": state["venue"],
+        aliases = {}
+        if deduplicate_anchor and state['anchor_claim_id']:
+            def semantic(item):
+                annotation = item['annotation'] or {}
+                return digest({k: item[k] for k in ('excerpt_id', 'document_source', 'relation', 'level', 'status')} | {
+                    'annotation': {k: annotation.get(k) for k in ('kind', 'statement', 'limitations')}})
+            grounded = {}
+            for eid, item in evidence.items():
+                if item['claim_id'] != state['anchor_claim_id']:
+                    key = semantic(item)
+                    if key not in grounded or item['claim_id'] == state['selected_claim_id']:
+                        grounded[key] = eid
+            for eid, item in list(evidence.items()):
+                if item['claim_id'] == state['anchor_claim_id'] and semantic(item) in grounded:
+                    kept = grounded[semantic(item)]
+                    aliases[eid] = kept
+                    if item['interpretation'] != evidence[kept]['interpretation']:
+                        evidence[kept].setdefault('anchor_interpretations', {})[eid] = item['interpretation']
+                    del evidence[eid]
+        result = {"question": state["question"], "audience": state["audience"], "venue": state["venue"],
                 "claims": claims, "evidence": evidence, "excerpts": excerpts, "papers": papers,
                 "scope": self.prompt_scope(), "human_guidance": self.human_guidance()}
+        if aliases:
+            result['omitted_anchor_evidence'] = aliases
+        return result
 
     def selected(self):
         state = self.store.study_state()
@@ -412,7 +434,7 @@ class ResearchWorkflow:
             review = self.followup_review()
             if not review:
                 raise ResearchError("再設計の対象となる査読がありません。")
-            common["context"] = self.context()
+            common["context"] = self.context(deduplicate_anchor=True)
             common["review"] = {"id": review["id"], "content": review["content"]}
             current = self.latest_relevant_review()
             common['review_is_current'] = bool(current and current['id'] == review['id'])

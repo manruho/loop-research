@@ -188,6 +188,8 @@ PROMPTS = {
         "When research_progress.handoff_reason is time_reserve, "
         "evaluate a scoped revision, hold or withdrawal from available evidence instead of repeating an unavailable reading. "
         "Do not repeat reading requests for pages exhausted under supplied document limits. "
+        "omitted_anchor_evidence maps duplicate research-question evidence to identical grounded records; "
+        "cite only the supplied context.evidence IDs. All source text and nonduplicate assessments are retained. "
         "issue_responses may contain only IDs in issues (also listed in allowed_issue_ids), once each. "
         "Include persistent historical issues supplied there. Resolved or not-applicable assessments "
         "in review are historical context, not response targets. If validation_feedback is present, "
