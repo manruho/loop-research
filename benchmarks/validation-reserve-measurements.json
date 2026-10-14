@@ -1,0 +1,494 @@
+{
+  "date": "2026-10-14",
+  "notice": "Single diagnostic attempts, not quality superiority. Failed original runs retained. Continuations inherit research effort; the repair continuation follows a code change and a pause, not one frozen end-to-end run. Human scoring pending.",
+  "fresh_attempts": [
+    {
+      "implementation_commit": "426ce764f821e43d062728d9d45367e2e293d8d8",
+      "seconds_limit": 600,
+      "cases_sha256": "d0ccc81d996c7cf5f32b71fa31a61b4e5aa2a976e96227fcd72e6065b0388673",
+      "source_sha256": {
+        "engine.py": "93b612cafed833731bce5f6cf41e18af9c58da641edb53c303c3e6a2260863dc",
+        "retrieval_eval.py": "d6a9983aba352af0c6446904d43b3acb12ef4694396909796341e8fb9d5643bc",
+        "__main__.py": "935a1c1166b0c1ea35a82256345000bf2c73ded718d77773bc27a71ecce28f7d",
+        "codex.py": "1fdc6b0cca20e5ae01b8506953ee0c68eb510a3ae45aa1990cfc21c3f6a5a39b",
+        "literature_store.py": "d53ff39c99241d785fd0676f2bc3be7d41dc759a1621cf5d72161dce19006ff7",
+        "workflow_store.py": "f5ed154ebc1653bbd69206f50dc5e83601c58b65dfbfb693167dd92399c3826d",
+        "runtime.py": "2ac63d09b3b9cc5976fe11ed2d58777c556b00269cb8fc41b64aad29fa53c638",
+        "discovery.py": "d3506f2626d649adec9199997defb6f97f1f35b4333626fe124079ada1ea5629",
+        "literature.py": "8089c30b0d123a909dabe68253e624cfd73d95b93d5f50b1043d5698213612fe",
+        "budget.py": "2b5f684e68c4acd59f457b6eed71bfa1548fc1669fdbb8ce08ccde1978e6f441",
+        "latex.py": "b88ba556e2289fc2c1829b3f0c98458197a754a727b909db5b23026b12fe9e39",
+        "cli.py": "c7dfb820a4718a73afa61a370f0279c6adefbb863c3663cbca6ddbf1e5dbe68e",
+        "extraction_eval.py": "7822954a3585e1b86e193fc0f507a86e0d8e71a669de3c0f5c91fd0eca72dd08",
+        "store.py": "b324cbd636aeb126cef81b3ba3a8c7f98db19c1e07d4e1ee75987ba4c50b6217",
+        "common.py": "1a6e0cbe33f193dbb34b5803e15fd6224e59314931c5b717c5fa43f9624808d0",
+        "ledger.py": "8ce4c3b4358cd84df48e3c3b0b8020d303029170665bb883608da0aa5df23620",
+        "export.py": "66c6e63ecf117046271a6c72ac0dfab6f7c385ec697f40810287fa9d5d0aa22b",
+        "__init__.py": "1ce818ca82e9e12583f82c17815970f3263632eb7b1fbf2c2332bf9a2dc1dc53",
+        "evaluation.py": "eff45a1f8461c8360f4728243f2bb0b423e4f27cf58808959eff9f43278b56cd",
+        "schema.py": "c455d210453ded546868f7406ddddcbf3d0172d5d4a2a4fb2d8076921de73a8f",
+        "roles.py": "7a333cf8de18c81ade51ebead3d1122052d5274456b5159e605d8d044aac0c8c",
+        "verification.py": "e7c2fd20885b9ce7273535da919ab51f88d3e0634052432186ca109f14665c31",
+        "selection.py": "1a52e431eb99197fd418a040ff5d6d5d00e0ac4f989a1b3ed502082fb0cbf40c",
+        "quality_store.py": "0f0855ec80b8f2827c78bf51efe52bb6317420cbcdf4740f08de35636e48a819",
+        "workflow.py": "7c3971d173dbcba92b0f97140163ca56fa7a8717b12fbd88cf5efd7e906b7974"
+      },
+      "requested_model": "gpt-6.1-sol",
+      "requested_review_model": "gpt-6-sol",
+      "status": "budget_exhausted",
+      "elapsed_seconds": 330.3983021369786,
+      "phase_metrics": {
+        "phases": {
+          "orientation": {
+            "calls": 1,
+            "seconds": 32.0,
+            "failed": 0
+          },
+          "selection": {
+            "calls": 2,
+            "seconds": 101.0,
+            "failed": 0
+          },
+          "reading": {
+            "calls": 1,
+            "seconds": 70.0,
+            "failed": 0
+          },
+          "exploration": {
+            "calls": 1,
+            "seconds": 60.0,
+            "failed": 0
+          },
+          "comparison": {
+            "calls": 1,
+            "seconds": 44.0,
+            "failed": 0
+          },
+          "outline": {
+            "calls": 1,
+            "seconds": 13.0,
+            "failed": 1
+          }
+        },
+        "seconds_to_first_draft": null,
+        "calls_to_first_draft": null,
+        "reported_usage": {
+          "cache_write_input_tokens": 0,
+          "cached_input_tokens": 12800,
+          "input_tokens": 98059,
+          "output_tokens": 8139,
+          "reasoning_output_tokens": 517
+        },
+        "usage_unavailable_calls": 1,
+        "notice": "CLI-reported tokens; missing usage is unknown, not zero. No inference compute estimate."
+      },
+      "current_draft": null,
+      "reason": "検証・査読の予約時間を維持する工程上限に達しました。T007: Codex作業が制限時間を超えました。",
+      "identifier_metrics": {
+        "expected_reference_count": 7,
+        "expected_in_final_manuscript": [],
+        "identifiable_final_citation_ids": [],
+        "scope": "Identifier matching only. Missing identifiers are not proof that a paper was unread; relevance and support require human evaluation.",
+        "expected_discovered_in_ledger": [
+          "arxiv:2211.09110"
+        ],
+        "expected_read_in_ledger": [
+          "arxiv:2211.09110"
+        ],
+        "reference_discovery_recall": 0.14285714285714285,
+        "reference_reading_recall": 0.14285714285714285,
+        "fetched_documents": 1,
+        "discovery_attempts": [
+          {
+            "provider": "arxiv",
+            "status": "completed",
+            "count": 2
+          }
+        ],
+        "native_fact_verdicts": null,
+        "native_verification_scope": "Harness AI judgments only, not an independently comparable quality score or human ground truth."
+      }
+    },
+    {
+      "implementation_commit": "acc2938",
+      "seconds_limit": 600,
+      "cases_sha256": "d0ccc81d996c7cf5f32b71fa31a61b4e5aa2a976e96227fcd72e6065b0388673",
+      "source_sha256": {
+        "engine.py": "93b612cafed833731bce5f6cf41e18af9c58da641edb53c303c3e6a2260863dc",
+        "retrieval_eval.py": "d6a9983aba352af0c6446904d43b3acb12ef4694396909796341e8fb9d5643bc",
+        "__main__.py": "935a1c1166b0c1ea35a82256345000bf2c73ded718d77773bc27a71ecce28f7d",
+        "codex.py": "1fdc6b0cca20e5ae01b8506953ee0c68eb510a3ae45aa1990cfc21c3f6a5a39b",
+        "literature_store.py": "d53ff39c99241d785fd0676f2bc3be7d41dc759a1621cf5d72161dce19006ff7",
+        "workflow_store.py": "f5ed154ebc1653bbd69206f50dc5e83601c58b65dfbfb693167dd92399c3826d",
+        "runtime.py": "2ac63d09b3b9cc5976fe11ed2d58777c556b00269cb8fc41b64aad29fa53c638",
+        "discovery.py": "d3506f2626d649adec9199997defb6f97f1f35b4333626fe124079ada1ea5629",
+        "literature.py": "8089c30b0d123a909dabe68253e624cfd73d95b93d5f50b1043d5698213612fe",
+        "budget.py": "a1c728044e2382a50b8ba85a5cd7037c5e3fbaa58fcb085b49381c1fc81c237a",
+        "latex.py": "b88ba556e2289fc2c1829b3f0c98458197a754a727b909db5b23026b12fe9e39",
+        "cli.py": "c7dfb820a4718a73afa61a370f0279c6adefbb863c3663cbca6ddbf1e5dbe68e",
+        "extraction_eval.py": "7822954a3585e1b86e193fc0f507a86e0d8e71a669de3c0f5c91fd0eca72dd08",
+        "store.py": "b324cbd636aeb126cef81b3ba3a8c7f98db19c1e07d4e1ee75987ba4c50b6217",
+        "common.py": "1a6e0cbe33f193dbb34b5803e15fd6224e59314931c5b717c5fa43f9624808d0",
+        "ledger.py": "8ce4c3b4358cd84df48e3c3b0b8020d303029170665bb883608da0aa5df23620",
+        "export.py": "66c6e63ecf117046271a6c72ac0dfab6f7c385ec697f40810287fa9d5d0aa22b",
+        "__init__.py": "1ce818ca82e9e12583f82c17815970f3263632eb7b1fbf2c2332bf9a2dc1dc53",
+        "evaluation.py": "eff45a1f8461c8360f4728243f2bb0b423e4f27cf58808959eff9f43278b56cd",
+        "schema.py": "c455d210453ded546868f7406ddddcbf3d0172d5d4a2a4fb2d8076921de73a8f",
+        "roles.py": "7a333cf8de18c81ade51ebead3d1122052d5274456b5159e605d8d044aac0c8c",
+        "verification.py": "e7c2fd20885b9ce7273535da919ab51f88d3e0634052432186ca109f14665c31",
+        "selection.py": "1a52e431eb99197fd418a040ff5d6d5d00e0ac4f989a1b3ed502082fb0cbf40c",
+        "quality_store.py": "0f0855ec80b8f2827c78bf51efe52bb6317420cbcdf4740f08de35636e48a819",
+        "workflow.py": "af062c90f6f87a590bcaced5d8112ce24459bdba46d97dfbe649568b48a8c96f"
+      },
+      "requested_model": "gpt-6.1-sol",
+      "requested_review_model": "gpt-6-sol",
+      "status": "needs_human",
+      "elapsed_seconds": 329.70864858600544,
+      "phase_metrics": {
+        "phases": {
+          "orientation": {
+            "calls": 1,
+            "seconds": 21.0,
+            "failed": 0
+          },
+          "selection": {
+            "calls": 2,
+            "seconds": 71.0,
+            "failed": 0
+          },
+          "reading": {
+            "calls": 1,
+            "seconds": 30.0,
+            "failed": 0
+          },
+          "exploration": {
+            "calls": 1,
+            "seconds": 24.0,
+            "failed": 0
+          },
+          "comparison": {
+            "calls": 1,
+            "seconds": 23.0,
+            "failed": 0
+          },
+          "outline": {
+            "calls": 1,
+            "seconds": 30.0,
+            "failed": 0
+          },
+          "draft": {
+            "calls": 1,
+            "seconds": 62.0,
+            "failed": 0
+          },
+          "verify": {
+            "calls": 1,
+            "seconds": 61.0,
+            "failed": 1
+          }
+        },
+        "seconds_to_first_draft": 268.0,
+        "calls_to_first_draft": 8,
+        "reported_usage": {
+          "cache_write_input_tokens": 0,
+          "cached_input_tokens": 11264,
+          "input_tokens": 149544,
+          "output_tokens": 12187,
+          "reasoning_output_tokens": 806
+        },
+        "usage_unavailable_calls": 0,
+        "notice": "CLI-reported tokens; missing usage is unknown, not zero. No inference compute estimate."
+      },
+      "current_draft": "A008",
+      "reason": "T009: F006 B003.text: 検証対象の引用または出現位置が保存本文に一致しません。",
+      "identifier_metrics": {
+        "expected_reference_count": 7,
+        "expected_in_final_manuscript": [
+          "arxiv:2211.09110"
+        ],
+        "identifiable_final_citation_ids": [
+          "arxiv:2211.09110"
+        ],
+        "scope": "Identifier matching only. Missing identifiers are not proof that a paper was unread; relevance and support require human evaluation.",
+        "expected_discovered_in_ledger": [
+          "arxiv:1810.03993",
+          "arxiv:2211.09110"
+        ],
+        "expected_read_in_ledger": [
+          "arxiv:2211.09110"
+        ],
+        "reference_discovery_recall": 0.2857142857142857,
+        "reference_reading_recall": 0.14285714285714285,
+        "fetched_documents": 1,
+        "discovery_attempts": [
+          {
+            "provider": "arxiv",
+            "status": "completed",
+            "count": 2
+          }
+        ],
+        "native_fact_verdicts": null,
+        "native_verification_scope": "Harness AI judgments only, not an independently comparable quality score or human ground truth."
+      }
+    }
+  ],
+  "continuations": [
+    {
+      "experiment": "benchmark-reporting-validation-audit-v2",
+      "implementation_commit": "acc2938",
+      "seconds_limit": 600,
+      "source_sha256": {
+        "engine.py": "93b612cafed833731bce5f6cf41e18af9c58da641edb53c303c3e6a2260863dc",
+        "retrieval_eval.py": "d6a9983aba352af0c6446904d43b3acb12ef4694396909796341e8fb9d5643bc",
+        "__main__.py": "935a1c1166b0c1ea35a82256345000bf2c73ded718d77773bc27a71ecce28f7d",
+        "codex.py": "1fdc6b0cca20e5ae01b8506953ee0c68eb510a3ae45aa1990cfc21c3f6a5a39b",
+        "literature_store.py": "d53ff39c99241d785fd0676f2bc3be7d41dc759a1621cf5d72161dce19006ff7",
+        "workflow_store.py": "f5ed154ebc1653bbd69206f50dc5e83601c58b65dfbfb693167dd92399c3826d",
+        "runtime.py": "2ac63d09b3b9cc5976fe11ed2d58777c556b00269cb8fc41b64aad29fa53c638",
+        "discovery.py": "d3506f2626d649adec9199997defb6f97f1f35b4333626fe124079ada1ea5629",
+        "literature.py": "8089c30b0d123a909dabe68253e624cfd73d95b93d5f50b1043d5698213612fe",
+        "budget.py": "a1c728044e2382a50b8ba85a5cd7037c5e3fbaa58fcb085b49381c1fc81c237a",
+        "latex.py": "b88ba556e2289fc2c1829b3f0c98458197a754a727b909db5b23026b12fe9e39",
+        "cli.py": "c7dfb820a4718a73afa61a370f0279c6adefbb863c3663cbca6ddbf1e5dbe68e",
+        "extraction_eval.py": "7822954a3585e1b86e193fc0f507a86e0d8e71a669de3c0f5c91fd0eca72dd08",
+        "store.py": "b324cbd636aeb126cef81b3ba3a8c7f98db19c1e07d4e1ee75987ba4c50b6217",
+        "common.py": "1a6e0cbe33f193dbb34b5803e15fd6224e59314931c5b717c5fa43f9624808d0",
+        "ledger.py": "8ce4c3b4358cd84df48e3c3b0b8020d303029170665bb883608da0aa5df23620",
+        "export.py": "66c6e63ecf117046271a6c72ac0dfab6f7c385ec697f40810287fa9d5d0aa22b",
+        "__init__.py": "1ce818ca82e9e12583f82c17815970f3263632eb7b1fbf2c2332bf9a2dc1dc53",
+        "evaluation.py": "eff45a1f8461c8360f4728243f2bb0b423e4f27cf58808959eff9f43278b56cd",
+        "schema.py": "c455d210453ded546868f7406ddddcbf3d0172d5d4a2a4fb2d8076921de73a8f",
+        "roles.py": "7a333cf8de18c81ade51ebead3d1122052d5274456b5159e605d8d044aac0c8c",
+        "verification.py": "e7c2fd20885b9ce7273535da919ab51f88d3e0634052432186ca109f14665c31",
+        "selection.py": "1a52e431eb99197fd418a040ff5d6d5d00e0ac4f989a1b3ed502082fb0cbf40c",
+        "quality_store.py": "0f0855ec80b8f2827c78bf51efe52bb6317420cbcdf4740f08de35636e48a819",
+        "workflow.py": "af062c90f6f87a590bcaced5d8112ce24459bdba46d97dfbe649568b48a8c96f"
+      },
+      "notice": "Continuation from a copy of an existing unverified draft, not a fresh research run. Original study unchanged.",
+      "status": "budget_exhausted",
+      "reason": "検証・査読の予約時間を維持する工程上限に達しました。T016: Codex作業が制限時間を超えました。",
+      "elapsed_seconds": 330.2370733059943,
+      "phase_metrics": {
+        "phases": {
+          "verify": {
+            "calls": 1,
+            "seconds": 110.0,
+            "failed": 0
+          },
+          "review": {
+            "calls": 1,
+            "seconds": 33.0,
+            "failed": 0
+          },
+          "decision": {
+            "calls": 1,
+            "seconds": 17.0,
+            "failed": 0
+          },
+          "selection": {
+            "calls": 3,
+            "seconds": 124.0,
+            "failed": 0
+          },
+          "reading": {
+            "calls": 1,
+            "seconds": 26.0,
+            "failed": 1
+          }
+        },
+        "seconds_to_first_draft": null,
+        "calls_to_first_draft": null,
+        "reported_usage": {
+          "cache_write_input_tokens": 0,
+          "cached_input_tokens": 22528,
+          "input_tokens": 127908,
+          "output_tokens": 12859,
+          "reasoning_output_tokens": 469
+        },
+        "usage_unavailable_calls": 1,
+        "notice": "CLI-reported tokens; missing usage is unknown, not zero. No inference compute estimate."
+      },
+      "current_draft": null,
+      "current_verification": null,
+      "fact_verdicts": null,
+      "ledger_verdicts": null,
+      "new_tasks": [
+        {
+          "id": "T010",
+          "kind": "verify",
+          "status": "completed",
+          "started_at": "2026-10-14T11:05:20+00:00",
+          "finished_at": "2026-10-14T11:07:10+00:00",
+          "error": null
+        },
+        {
+          "id": "T011",
+          "kind": "review",
+          "status": "completed",
+          "started_at": "2026-10-14T11:07:10+00:00",
+          "finished_at": "2026-10-14T11:07:43+00:00",
+          "error": null
+        },
+        {
+          "id": "T012",
+          "kind": "decision",
+          "status": "completed",
+          "started_at": "2026-10-14T11:07:43+00:00",
+          "finished_at": "2026-10-14T11:08:00+00:00",
+          "error": null
+        },
+        {
+          "id": "T013",
+          "kind": "selection",
+          "status": "completed",
+          "started_at": "2026-10-14T11:08:20+00:00",
+          "finished_at": "2026-10-14T11:09:31+00:00",
+          "error": null
+        },
+        {
+          "id": "T014",
+          "kind": "selection",
+          "status": "completed",
+          "started_at": "2026-10-14T11:09:31+00:00",
+          "finished_at": "2026-10-14T11:10:03+00:00",
+          "error": null
+        },
+        {
+          "id": "T015",
+          "kind": "selection",
+          "status": "completed",
+          "started_at": "2026-10-14T11:10:03+00:00",
+          "finished_at": "2026-10-14T11:10:24+00:00",
+          "error": null
+        },
+        {
+          "id": "T016",
+          "kind": "reading",
+          "status": "timed_out",
+          "started_at": "2026-10-14T11:10:24+00:00",
+          "finished_at": "2026-10-14T11:10:50+00:00",
+          "error": "Codex作業が制限時間を超えました。"
+        }
+      ],
+      "source_unchanged": true,
+      "original_database_unchanged": true,
+      "human_evaluation": "pending",
+      "approved": false,
+      "review_decision": "revise",
+      "review_severity_counts": {
+        "major": 10,
+        "minor": 3
+      },
+      "historical_verification_fact_verdicts": {
+        "supported": 8,
+        "partial": 1
+      },
+      "historical_verification_ledger_verdicts": {
+        "supported": 17,
+        "undetermined": 4
+      }
+    },
+    {
+      "experiment": "benchmark-reporting-validation-repair-v3",
+      "implementation_commit": "f6a314a",
+      "seconds_limit": 270,
+      "source_sha256": {
+        "engine.py": "93b612cafed833731bce5f6cf41e18af9c58da641edb53c303c3e6a2260863dc",
+        "retrieval_eval.py": "d6a9983aba352af0c6446904d43b3acb12ef4694396909796341e8fb9d5643bc",
+        "__main__.py": "935a1c1166b0c1ea35a82256345000bf2c73ded718d77773bc27a71ecce28f7d",
+        "codex.py": "1fdc6b0cca20e5ae01b8506953ee0c68eb510a3ae45aa1990cfc21c3f6a5a39b",
+        "literature_store.py": "d53ff39c99241d785fd0676f2bc3be7d41dc759a1621cf5d72161dce19006ff7",
+        "workflow_store.py": "f5ed154ebc1653bbd69206f50dc5e83601c58b65dfbfb693167dd92399c3826d",
+        "runtime.py": "2ac63d09b3b9cc5976fe11ed2d58777c556b00269cb8fc41b64aad29fa53c638",
+        "discovery.py": "d3506f2626d649adec9199997defb6f97f1f35b4333626fe124079ada1ea5629",
+        "literature.py": "8089c30b0d123a909dabe68253e624cfd73d95b93d5f50b1043d5698213612fe",
+        "budget.py": "a1c728044e2382a50b8ba85a5cd7037c5e3fbaa58fcb085b49381c1fc81c237a",
+        "latex.py": "b88ba556e2289fc2c1829b3f0c98458197a754a727b909db5b23026b12fe9e39",
+        "cli.py": "c7dfb820a4718a73afa61a370f0279c6adefbb863c3663cbca6ddbf1e5dbe68e",
+        "extraction_eval.py": "7822954a3585e1b86e193fc0f507a86e0d8e71a669de3c0f5c91fd0eca72dd08",
+        "store.py": "b324cbd636aeb126cef81b3ba3a8c7f98db19c1e07d4e1ee75987ba4c50b6217",
+        "common.py": "1a6e0cbe33f193dbb34b5803e15fd6224e59314931c5b717c5fa43f9624808d0",
+        "ledger.py": "8ce4c3b4358cd84df48e3c3b0b8020d303029170665bb883608da0aa5df23620",
+        "export.py": "66c6e63ecf117046271a6c72ac0dfab6f7c385ec697f40810287fa9d5d0aa22b",
+        "__init__.py": "1ce818ca82e9e12583f82c17815970f3263632eb7b1fbf2c2332bf9a2dc1dc53",
+        "evaluation.py": "eff45a1f8461c8360f4728243f2bb0b423e4f27cf58808959eff9f43278b56cd",
+        "schema.py": "c455d210453ded546868f7406ddddcbf3d0172d5d4a2a4fb2d8076921de73a8f",
+        "roles.py": "7a333cf8de18c81ade51ebead3d1122052d5274456b5159e605d8d044aac0c8c",
+        "verification.py": "e7c2fd20885b9ce7273535da919ab51f88d3e0634052432186ca109f14665c31",
+        "selection.py": "1a52e431eb99197fd418a040ff5d6d5d00e0ac4f989a1b3ed502082fb0cbf40c",
+        "quality_store.py": "0f0855ec80b8f2827c78bf51efe52bb6317420cbcdf4740f08de35636e48a819",
+        "workflow.py": "2a7bfdaf7c147edbda5bcbff8ee053ce34e49ad74123cb989a784a9401dc4b45"
+      },
+      "notice": "Separate continuation of a copied failed v2 study after a code repair. Original v2 failure retained. Not a single frozen end-to-end run.",
+      "elapsed_seconds": 126.2116038959939,
+      "status": "budget_exhausted",
+      "reason": "今回の作業上限に達しました。研究が完成したとは扱いません。",
+      "phase_metrics": {
+        "phases": {
+          "verify": {
+            "calls": 1,
+            "seconds": 89.0,
+            "failed": 0
+          },
+          "review": {
+            "calls": 1,
+            "seconds": 37.0,
+            "failed": 0
+          }
+        },
+        "seconds_to_first_draft": null,
+        "calls_to_first_draft": null,
+        "reported_usage": {
+          "cache_write_input_tokens": 0,
+          "cached_input_tokens": 0,
+          "input_tokens": 49135,
+          "output_tokens": 8723,
+          "reasoning_output_tokens": 112
+        },
+        "usage_unavailable_calls": 0,
+        "notice": "CLI-reported tokens; missing usage is unknown, not zero. No inference compute estimate."
+      },
+      "current_draft": "A008",
+      "current_verification": "U009",
+      "fact_verdicts": {
+        "supported": 3,
+        "partial": 4
+      },
+      "ledger_verdicts": {
+        "supported": 17,
+        "undetermined": 3
+      },
+      "new_tasks": [
+        {
+          "id": "T010",
+          "kind": "verify",
+          "status": "completed",
+          "error": null
+        },
+        {
+          "id": "T011",
+          "kind": "review",
+          "status": "completed",
+          "error": null
+        }
+      ],
+      "original_database_unchanged": true,
+      "source_unchanged": true,
+      "human_evaluation": "pending",
+      "approved": false,
+      "review_decision": "revise",
+      "review_severity_counts": {
+        "major": 11,
+        "minor": 4
+      },
+      "historical_verification_fact_verdicts": {
+        "supported": 3,
+        "partial": 4
+      },
+      "historical_verification_ledger_verdicts": {
+        "supported": 17,
+        "undetermined": 3
+      }
+    }
+  ]
+}

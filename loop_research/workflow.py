@@ -10,7 +10,7 @@ import sqlite3
 import sys
 import time
 
-from . import roles, verification
+from . import roles, verification, budget
 from .common import ResearchError, identifier, label, now
 from .engine import CodexEngine, EngineFailure, process_alive
 from .literature import fetch_paper, search_papers
@@ -64,6 +64,7 @@ class ResearchWorkflow:
         self.store = store
         state = store.study_state()
         self.deadline = None
+        self.run_seconds = None
         self.injected_engine = engine is not None
         self.engine = engine or CodexEngine(state["settings"]["model"], state["settings"]["timeout"],
                                            state["settings"]["reasoning_effort"])
@@ -80,11 +81,23 @@ class ResearchWorkflow:
         reviewer = kind in ("review", "verify")
         timeout = settings["timeout"]
         if self.deadline is not None:
-            timeout = min(timeout, self.deadline - time.monotonic())
+            remaining = self.deadline - time.monotonic()
+            timeout = (budget.allocation(kind, self.run_seconds, remaining, timeout)['timeout_seconds']
+                       if self.run_seconds is not None else min(timeout, remaining))
             if timeout <= 0:
                 raise ResearchError("今回の実行時間上限に達しました。")
         return CodexEngine(settings["review_model"] if reviewer else settings["model"], timeout,
                            settings["review_effort"] if reviewer else settings["reasoning_effort"])
+
+    def prompt_for(self, kind, data=None):
+        prompt = budget.prompt(kind, roles.PROMPTS[kind]) if self.run_seconds is not None else roles.PROMPTS[kind]
+        if kind == 'verify' and data and data.get('validation_feedback'):
+            prompt += ('\nVALIDATION REPAIR: The previous result failed the host contract and was not applied. '
+                       'Correct validation_feedback using the original supplied manuscript and sources. '
+                       'Copy exact contiguous assertion/source spans and their occurrences; never align paraphrases approximately. '
+                       'Reinspect ALL required targets and retain unsupported/partial/undetermined judgments and uncertainty. '
+                       'Do not alter the manuscript, infer missing evidence, or lower the support standard to make validation pass.')
+        return prompt
 
     def current_verification(self):
         draft = self.current_artifact("draft")
@@ -363,6 +376,15 @@ class ResearchWorkflow:
                                      "scope": context["scope"], "human_guidance": context["human_guidance"],
                                      "evidence": {eid: {"claim_id": item["claim_id"], "level": item["level"], "status": item["status"]}
                                                   for eid, item in context["evidence"].items()}}
+                for entry in reversed(self.store.list_tasks()):
+                    if entry['kind'] != 'verify' or entry['status'] != 'failed':
+                        continue
+                    failed = self.store.show_task(entry['id'])
+                    prior = dict(failed['input']['data'])
+                    prior.pop('validation_feedback', None)
+                    if failed['result'] is not None and prior == common:
+                        common['validation_feedback'] = {'task_id': failed['id'], 'error': failed['error']}
+                        break
             else:
                 verified = self.current_verification()
                 if not verified:
@@ -407,7 +429,7 @@ class ResearchWorkflow:
             self.store.db.rollback()
             raise
         config = self.engine_for(kind).config
-        key = digest({"kind": kind, "data": data, "prompt": roles.PROMPTS[kind], "schema": SCHEMAS[kind],
+        key = digest({"kind": kind, "data": data, "prompt": self.prompt_for(kind, data), "schema": SCHEMAS[kind],
                       "prompt_version": roles.PROMPT_VERSIONS[kind], "model": config.get("model"),
                       "reasoning_effort": config.get("reasoning_effort")})
         return data, key, fingerprint
@@ -421,15 +443,19 @@ class ResearchWorkflow:
             if row:
                 return self.store.show_task(label(row[0], "T"))
         engine = self.engine_for(kind)
-        task = self.store.start_task(kind, key, data, roles.PROMPTS[kind], SCHEMAS[kind],
-                                     dict(engine.config, prompt_version=roles.PROMPT_VERSIONS[kind]), fingerprint)
+        config = dict(engine.config, prompt_version=roles.PROMPT_VERSIONS[kind])
+        if self.run_seconds is not None:
+            config['run_budget'] = budget.allocation(kind, self.run_seconds, self.deadline - time.monotonic(),
+                                                    self.store.study_state()['settings']['timeout'])
+        prompt = self.prompt_for(kind, data)
+        task = self.store.start_task(kind, key, data, prompt, SCHEMAS[kind], config, fingerprint)
         task_id = task["id"]
         print(f"{task_id}: {kind}を実行しています…", file=sys.stderr, flush=True)
         raw = None
         execution = None
         try:
             raw, execution = engine.execute(
-                kind, data, roles.PROMPTS[kind], SCHEMAS[kind],
+                kind, data, prompt, SCHEMAS[kind],
                 on_spawn=lambda pid, identity: self.store.task_process(task_id, pid, identity),
             )
             validate(raw, SCHEMAS[kind])
@@ -515,8 +541,9 @@ class ResearchWorkflow:
 
     def cached_selection(self, document=None):
         data = self.data_for('selection', document=document)
-        config = self.engine_for('selection').config
-        key = digest({'kind': 'selection', 'data': data, 'prompt': roles.PROMPTS['selection'],
+        settings = self.store.study_state()['settings']
+        config = self.engine.config if self.injected_engine else settings
+        key = digest({'kind': 'selection', 'data': data, 'prompt': self.prompt_for('selection'),
                       'schema': SCHEMAS['selection'], 'prompt_version': roles.PROMPT_VERSIONS['selection'],
                       'model': config.get('model'), 'reasoning_effort': config.get('reasoning_effort')})
         return self.store.latest_artifact('selection', key)
@@ -677,6 +704,17 @@ class ResearchWorkflow:
         def add(kind, reason, **parameters):
             result.append({"choice_id": f"choice_{len(result)+1:02d}", "kind": kind,
                            "parameters": parameters, "reason": reason})
+        cid = state['selected_claim_id']
+        if self.run_seconds is not None and cid and self.store.claim_row(cid)['status'] not in ('held', 'withdrawn'):
+            draft = self.current_artifact('draft')
+            if draft:
+                if not self.current_verification():
+                    add('verify', '時間予算内で現行草稿の事実検証を追加探索より先に実行する')
+                    return result
+                review = self.latest_relevant_review()
+                if not review or review['input']['draft']['id'] != draft['id']:
+                    add('review', '検証済み草稿の独立した査読を追加探索より先に実行する')
+                    return result
         if not self.orientation():
             add("orientation", "問いと隣接領域・競合する立場の探索方針を整理する")
             return result
@@ -729,7 +767,7 @@ class ResearchWorkflow:
                 for page in wanted:
                     if page not in seen:
                         add("reading", "取得資料の関連箇所を読み、原文・解釈・未確認事項を分けて記録", document=doc["id"], page=page)
-        if not pending:
+        if not pending and not (checkpoint and not first_review and any(c['kind'] in ('fetch', 'reading') for c in result)):
             attempted = {(row["provider"], row["query"]) for row in self.store.list_searches()}
             graph_new = self.store.db.execute("SELECT COUNT(DISTINCT paper_id) FROM search_results WHERE search_id IN (SELECT id FROM searches WHERE query LIKE 'graph:%') AND paper_id NOT IN (SELECT paper_id FROM search_results WHERE search_id IN (SELECT id FROM searches WHERE query NOT LIKE 'graph:%'))").fetchone()[0]
             seeds = [p for p in self.ranked_papers() if p["provider"] == "manual" or any(
@@ -930,6 +968,14 @@ class ResearchWorkflow:
         if max_seconds is not None and (not isinstance(max_seconds, (int, float)) or isinstance(max_seconds, bool) or not 0 < max_seconds < float("inf")):
             raise ResearchError("実行時間上限は有限の正数で指定してください。")
         self.deadline = time.monotonic() + max_seconds if max_seconds is not None else None
+        self.run_seconds = max_seconds
+        try:
+            return self._run(steps, resume_reason)
+        finally:
+            self.deadline = None
+            self.run_seconds = None
+
+    def _run(self, steps, resume_reason):
         if type(steps) is not int or not 1 <= steps <= 1000:
             raise ResearchError("作業上限は1〜1000で指定してください。")
         with study_lock(self.store), termination_as_interrupt():
@@ -953,6 +999,7 @@ class ResearchWorkflow:
             self.store.ensure_anchor()
             completed = 0
             unchanged = 0
+            verification_repairs = 0
             try:
                 for step in range(steps):
                     if self.deadline is not None and time.monotonic() >= self.deadline:
@@ -960,6 +1007,22 @@ class ResearchWorkflow:
                         break
                     if self.store.study_state()["status"] != "active":
                         break
+                    # Stop before starting work that would consume the protected tail.
+                    # A fresh run/resume gets a fresh envelope; saved artifacts remain valid.
+                    if self.run_seconds is not None:
+                        selected = self.store.study_state()['selected_claim_id']
+                        if selected and self.store.claim_row(selected)['status'] in ('held', 'withdrawn'):
+                            selected = None
+                        draft = self.current_artifact('draft') if selected else None
+                        verified = self.current_verification() if draft else None
+                        reviewed = self.latest_relevant_review() if verified else None
+                        kind = ('verify' if draft and not verified else
+                                'review' if verified and not reviewed else 'draft')
+                        plan = budget.allocation(kind, self.run_seconds, self.deadline - time.monotonic(),
+                                                 self.store.study_state()['settings']['timeout'])
+                        if plan['timeout_seconds'] <= 0:
+                            self.store.control_study('budget_exhausted', '検証・査読用の時間を確保したため、未完了の前工程を停止しました。再開には新たな予算が必要です。')
+                            break
                     choices = self.choices()
                     if not choices:
                         self.store.control_study("needs_human", "次の有効な作業を特定できません。")
@@ -969,7 +1032,7 @@ class ResearchWorkflow:
                     elif all(item["kind"] in ("search", "related", "fetch", "reading") for item in choices):
                         # The orientation/search plan and host ranking already determine these operations.
                         # Execute discovery before acquisition; don't spend an extra model call per source.
-                        order = {"search": 0, "reading": 1, "related": 2, "fetch": 3}
+                        order = {"search": 0, "reading": 1, "fetch": 2, "related": 3}
                         choice = min(choices, key=lambda item: order[item["kind"]])
                     else:
                         decision = self.perform("decision", choices=choices)
@@ -980,6 +1043,15 @@ class ResearchWorkflow:
                     try:
                         self.execute_choice(choice)
                     except ResearchError as exc:
+                        tasks = self.store.list_tasks() if choice['kind'] == 'verify' else []
+                        failed = self.store.show_task(tasks[-1]['id']) if tasks else None
+                        if (isinstance(exc, EngineFailure) and self.run_seconds is not None
+                                and failed and choice['kind'] == 'verify' and not verification_repairs
+                                and failed['kind'] == 'verify' and failed['status'] == 'failed'
+                                and failed['result'] is not None and not failed['input']['data'].get('validation_feedback')):
+                            verification_repairs += 1
+                            print('検証の契約違反を保存。予約時間を維持して一度だけ訂正を依頼します。', file=sys.stderr, flush=True)
+                            continue
                         if choice["kind"] not in ("search", "fetch", "related"):
                             raise
                         print(f"{choice['kind']}の失敗を保存: {exc}", file=sys.stderr, flush=True)
@@ -997,7 +1069,12 @@ class ResearchWorkflow:
                     status = "interrupted" if isinstance(exc, KeyboardInterrupt) or getattr(exc, "status", None) == "interrupted" else "needs_human"
                     if self.deadline is not None and time.monotonic() >= self.deadline and not isinstance(exc, KeyboardInterrupt):
                         status = "budget_exhausted"
-                    self.store.control_study(status, str(exc) or "人間が研究を中断")
+                    elif self.run_seconds is not None and getattr(exc, 'status', None) == 'timed_out':
+                        status = 'budget_exhausted'
+                    reason = str(exc) or "人間が研究を中断"
+                    if status == 'budget_exhausted' and self.deadline is not None and time.monotonic() < self.deadline:
+                        reason = '検証・査読の予約時間を維持する工程上限に達しました。' + reason
+                    self.store.control_study(status, reason)
             except (ResearchError, OSError, sqlite3.Error) as exc:
                 if self.store.study_state()["status"] == "active":
                     self.store.control_study("needs_human", str(exc))

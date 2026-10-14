@@ -32,11 +32,12 @@ def study_options(command, steps=False):
     command.add_argument("--queries", type=int, dest="query_limit")
     command.add_argument('--draft-checkpoint-readings', type=int, help='暫定草稿に進む読解件数。0は従来の探索優先')
     command.add_argument('--semantic-selection', type=int, choices=[0, 1])
+    command.add_argument('--selection-page-limit', type=int, help='選別用に均等抽出するページ数。1〜60、既定16')
 
 
 def configure_options(store, args):
     settings = {key: getattr(args, key) for key in (
-        "model", "review_model", "review_effort", "citation_seeds", "citation_limit", "citation_budget", "timeout", "reasoning_effort", "provider", "paper_limit", "pages_per_document", "query_limit", "search_budget", 'draft_checkpoint_readings', 'semantic_selection'
+        "model", "review_model", "review_effort", "citation_seeds", "citation_limit", "citation_budget", "timeout", "reasoning_effort", "provider", "paper_limit", "pages_per_document", "query_limit", "search_budget", 'draft_checkpoint_readings', 'semantic_selection', 'selection_page_limit'
     ) if getattr(args, key, None) is not None}
     if settings:
         store.configure_study(getattr(args, "reason", None) or "CLI実行時の設定", settings=settings)
@@ -292,7 +293,7 @@ def dispatch(store, args):
     if args.command == "study":
         if args.action == "configure":
             settings = {key: getattr(args, key) for key in (
-                "model", "review_model", "review_effort", "citation_seeds", "citation_limit", "citation_budget", "timeout", "reasoning_effort", "provider", "paper_limit", "pages_per_document", "query_limit", "search_budget", 'draft_checkpoint_readings', 'semantic_selection'
+                "model", "review_model", "review_effort", "citation_seeds", "citation_limit", "citation_budget", "timeout", "reasoning_effort", "provider", "paper_limit", "pages_per_document", "query_limit", "search_budget", 'draft_checkpoint_readings', 'semantic_selection', 'selection_page_limit'
             ) if getattr(args, key, None) is not None}
             return store.configure_study(args.reason, args.question, args.audience, args.venue, settings)
         if args.action == "select":

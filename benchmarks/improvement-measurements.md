@@ -35,8 +35,8 @@ loop-research eval run --output .research/paired-new --model gpt-6.1-sol --revie
 loop-research eval packet --output .research/paired-new --review-model gpt-6-sol
 ```
 
-The full paired/ablation model study and independent human scoring have not been run for this change. The runner, method counterbalancing, fixed-source resume guard, arbitrary-method blind packet and descriptive metrics were regression tested. All methods retain fact verification, separate reviewer roles, provenance and human finalization.
+At the time of this synthetic diagnostic, a paired model study and independent human scoring had not been run. A later one-question real-literature pilot is recorded in [benchmark-reporting-results.md](benchmark-reporting-results.md); independent human scoring remains pending. The runner, method counterbalancing, fixed-source resume guard, arbitrary-method blind packet and descriptive metrics were regression tested. All methods retain fact verification, separate reviewer roles, provenance and human finalization.
 
 ## Remaining risks
 
-Semantic triage is provisional and bounded: at most 60 metadata candidates, or uniformly sampled 60 pages with beginning/end snippets. It can miss important text in unsampled pages or middle sections. The model can misclassify relevance and support. Exact source spans, context retention, expanded coverage and review catch some errors but do not prove academic support. Independent expert reference sets and repeated paired runs remain necessary.
+Semantic triage is provisional and bounded: at most 60 metadata candidates, or uniformly sampled pages with beginning/end snippets (initial implementation: 60 pages; pilot repair: default 16, configurable up to 60). It can miss important text in unsampled pages or middle sections. The model can misclassify relevance and support. Exact source spans, context retention, expanded coverage and review catch some errors but do not prove academic support. Independent expert reference sets and repeated paired runs remain necessary.
