@@ -30,11 +30,13 @@ def study_options(command, steps=False):
     command.add_argument("--pages", type=int, dest="pages_per_document")
     command.add_argument("--search-budget", type=int, help="追加・代替検索を含む通算検索上限（引用追跡は別予算）")
     command.add_argument("--queries", type=int, dest="query_limit")
+    command.add_argument('--draft-checkpoint-readings', type=int, help='暫定草稿に進む読解件数。0は従来の探索優先')
+    command.add_argument('--semantic-selection', type=int, choices=[0, 1])
 
 
 def configure_options(store, args):
     settings = {key: getattr(args, key) for key in (
-        "model", "review_model", "review_effort", "citation_seeds", "citation_limit", "citation_budget", "timeout", "reasoning_effort", "provider", "paper_limit", "pages_per_document", "query_limit", "search_budget"
+        "model", "review_model", "review_effort", "citation_seeds", "citation_limit", "citation_budget", "timeout", "reasoning_effort", "provider", "paper_limit", "pages_per_document", "query_limit", "search_budget", 'draft_checkpoint_readings', 'semantic_selection'
     ) if getattr(args, key, None) is not None}
     if settings:
         store.configure_study(getattr(args, "reason", None) or "CLI実行時の設定", settings=settings)
@@ -58,6 +60,13 @@ def parser():
     codex.add_subparsers(dest="action", required=True).add_parser("status")
     evaluation = commands.add_parser("eval", help="公開課題での探索的比較と人間評価")
     actions = evaluation.add_subparsers(dest="action", required=True)
+    retrieval = actions.add_parser('selection')
+    retrieval.add_argument('--output', required=True)
+    retrieval.add_argument('--cases', default='benchmarks/selection-cases.json')
+    retrieval.add_argument('--model')
+    retrieval.add_argument('--ranking')
+    retrieval.add_argument('--k', type=int, default=2)
+    retrieval.add_argument('--timeout', type=float, default=180)
     extraction = actions.add_parser("extraction")
     extraction.add_argument("--output", required=True)
     extraction.add_argument("--model", required=True)
@@ -70,6 +79,7 @@ def parser():
     evaluate.add_argument("--review-model", required=True)
     evaluate.add_argument("--seconds", type=int, default=1800)
     evaluate.add_argument("--resume", action="store_true")
+    evaluate.add_argument('--methods', nargs='+', choices=['baseline', 'harness', 'harness-no-checkpoint', 'harness-lexical', 'harness-no-citations'])
     packet = actions.add_parser("packet")
     packet.add_argument("--output", required=True)
     packet.add_argument("--review-model", required=True)
@@ -282,7 +292,7 @@ def dispatch(store, args):
     if args.command == "study":
         if args.action == "configure":
             settings = {key: getattr(args, key) for key in (
-                "model", "review_model", "review_effort", "citation_seeds", "citation_limit", "citation_budget", "timeout", "reasoning_effort", "provider", "paper_limit", "pages_per_document", "query_limit", "search_budget"
+                "model", "review_model", "review_effort", "citation_seeds", "citation_limit", "citation_budget", "timeout", "reasoning_effort", "provider", "paper_limit", "pages_per_document", "query_limit", "search_budget", 'draft_checkpoint_readings', 'semantic_selection'
             ) if getattr(args, key, None) is not None}
             return store.configure_study(args.reason, args.question, args.audience, args.venue, settings)
         if args.action == "select":
@@ -411,10 +421,13 @@ def main(argv=None):
             if args.action == "extraction":
                 from .extraction_eval import run
                 result = run(args.output, args.model, args.cases, args.timeout)
+            elif args.action == 'selection':
+                from .retrieval_eval import run
+                result = run(args.output, args.cases, args.model, args.ranking, args.k, args.timeout)
             elif args.action == "run":
                 if not 1 <= args.seconds <= 7200:
                     raise ResearchError("評価の時間上限は1〜7200秒です。")
-                result = evaluation.run_evaluation(args.output, args.cases, args.model, args.review_model, args.seconds, args.resume)
+                result = evaluation.run_evaluation(args.output, args.cases, args.model, args.review_model, args.seconds, args.resume, args.methods)
             elif args.action == "packet":
                 result = evaluation.packet(args.output, args.review_model)
             elif args.action == "import-scores":

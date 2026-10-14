@@ -143,6 +143,8 @@ PROMPTS = {
         "these will be checked against ledger_snapshot, not papers. Keep ledger and literature facts in separate blocks. "
         "Describe only recorded scope, never infer unrecorded activity did not occur. "
         "If validation_feedback is supplied, correct the failed draft contract. "
+        "If discovery_deferred is true, identify the manuscript as provisional and disclose deferred exploration; "
+        "do not claim literature completeness, established novelty or completed research. "
         "Map each major block to the selected C ID via claim_ids. Do not invent references, experiments, "
         "numbers, quotations, study findings or citation markers: the host adds citations. A block may "
         "express a normative position or hypothesis without empirical evidence if labeled accordingly. "
@@ -196,7 +198,32 @@ def blocks(draft):
     return draft["abstract_blocks"] + [block for section in draft["sections"] for block in section["blocks"]]
 
 
+def verification_blocks(draft):
+    """Stable verification targets for all prose, including manuscript metadata."""
+    metadata = [('MT001', draft['title'])] + [(f'MH{i:03}', section['heading']) for i, section in enumerate(draft['sections'], 1)]
+    metadata += [(f'MU{i:03}', text) for i, text in enumerate(draft['uncertainties'], 1)]
+    return blocks(draft) + [{'id': bid, 'text': text, 'qualification': '', 'kind': 'interpretation',
+                            'evidence_ids': [], 'claim_ids': []} for bid, text in metadata]
+
+
+def verification_targets(draft):
+    targets = [{'id': b['id'], 'source_path': f'/abstract_blocks/{i}', 'kind': b['kind']}
+               for i, b in enumerate(draft['abstract_blocks'])]
+    for i, section in enumerate(draft['sections']):
+        targets.extend({'id': b['id'], 'source_path': f'/sections/{i}/blocks/{j}', 'kind': b['kind']}
+                       for j, b in enumerate(section['blocks']))
+        targets.append({'id': f'MH{i+1:03}', 'source_path': f'/sections/{i}/heading', 'kind': 'interpretation'})
+    targets.append({'id': 'MT001', 'source_path': '/title', 'kind': 'interpretation'})
+    targets.extend({'id': f'MU{i+1:03}', 'source_path': f'/uncertainties/{i}', 'kind': 'interpretation'}
+                   for i in range(len(draft['uncertainties'])))
+    return targets
+
+
 def validate_semantics(kind, data, result):
+    if kind == 'selection':
+        from .selection import validate
+        validate(data, result)
+        return result
     context = data.get("context", {})
     evidences = context.get("evidence", {})
     claims = context.get("claims", {})
@@ -277,7 +304,7 @@ def validate_semantics(kind, data, result):
         from .verification import blocking
         if result["decision"] == "ready_for_human" and blocking(data["verification"]["content"]):
             raise ResearchError("未支持の事実主張や抽出不足を残したまま人間確認へ進めません。")
-        targets = {"draft": {data["draft"]["id"]}, "block": {b["id"] for b in blocks(data["draft"]["content"])},
+        targets = {"draft": {data["draft"]["id"]}, "block": {b["id"] for b in verification_blocks(data["draft"]["content"])},
                    "claim": set(claims), "evidence": set(evidences), "paper": set(papers),
                    "fact": {f["id"] for f in data["verification"]["content"]["facts"]},
                    "ledger_fact": {f["id"] for f in data["verification"]["content"].get("ledger_claims", [])}}
@@ -322,13 +349,16 @@ def validate_semantics(kind, data, result):
     return result
 
 
+from .selection import PROMPT as SELECTION_PROMPT
+PROMPTS['selection'] = SELECTION_PROMPT
 PROMPT_VERSIONS = {kind: 2 for kind in PROMPTS}
+PROMPT_VERSIONS['selection'] = 1
 PROMPT_VERSIONS["redesign"] = 3
-PROMPT_VERSIONS["draft"] = 3
+PROMPT_VERSIONS["draft"] = 4
 
 from .verification import PROMPT as VERIFY_PROMPT
 PROMPTS["verify"] = VERIFY_PROMPT
-PROMPT_VERSIONS["verify"] = 10
+PROMPT_VERSIONS["verify"] = 11
 
 PROMPTS["revise_draft"] = (
     "Revise the supplied English manuscript to address the supplied citation/fact verification issues. "
@@ -346,7 +376,8 @@ PROMPTS["revise_draft"] = (
 PROMPT_VERSIONS["revise_draft"] = 4
 PROMPTS["revise_draft"] += " Use ledger_fact with empty evidence_ids for factual research-record statements; keep scientific facts separately cited. Do not infer absence of unrecorded activity."
 
-PROMPT_VERSIONS["review"] = 5
+PROMPT_VERSIONS["review"] = 6
+PROMPTS['review'] += ' Inspect MT/MH/MU metadata targets as well as paragraphs. For each F/G claim inspect its context_id in verification.assertion_contexts and compare the complete proposition, negation and temporal scope to the check. A quoted superseded value is not the present value; a passing expression alone is not semantic support.'
 
 PROMPTS["review"] += " Ledger claims are separately host-checked against ledger_snapshot, not scientific-paper citations. Audit extraction coverage and the mapping from manuscript wording to checks; a passing expression does not prove its interpretation. Target G IDs with ledger_fact. Do not require literature citations for stored execution activity, and do not treat activity records as scientific support."
 

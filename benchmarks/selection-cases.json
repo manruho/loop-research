@@ -1,0 +1,108 @@
+{
+  "notice": "All candidates are synthetic developer fixtures, not publications or independent human relevance judgments. Labels measure fixed-pool ranking only.",
+  "cases": [
+    {
+      "id": "application-limits",
+      "question": "Should language model benchmarks report deployment limits?",
+      "terms": [
+        "language model",
+        "benchmark",
+        "deployment"
+      ],
+      "candidates": [
+        {
+          "id": "C1",
+          "title": "Operational envelopes for text generators",
+          "abstract": "A synthetic candidate describing which settings invalidate measured capability.",
+          "label": "core"
+        },
+        {
+          "id": "C2",
+          "title": "The case for a single leaderboard",
+          "abstract": "A synthetic rival arguing that stable aggregate comparisons suffice and contextual documentation adds burden.",
+          "label": "counter"
+        },
+        {
+          "id": "C3",
+          "title": "Language model benchmark deployment throughput",
+          "abstract": "Synthetic metadata about server throughput only.",
+          "label": "context"
+        },
+        {
+          "id": "C4",
+          "title": "Hail risk warnings",
+          "abstract": "Synthetic weather damage evaluation.",
+          "label": "unrelated"
+        }
+      ]
+    },
+    {
+      "id": "checking-burden",
+      "question": "Should human AI collaboration evaluate verification workload?",
+      "terms": [
+        "human AI",
+        "verification workload"
+      ],
+      "candidates": [
+        {
+          "id": "C1",
+          "title": "The cost of checking machine advice",
+          "abstract": "Synthetic metadata about time and effort spent inspecting recommendations.",
+          "label": "core"
+        },
+        {
+          "id": "C2",
+          "title": "Fast advice may outperform careful inspection",
+          "abstract": "A synthetic counterargument: time spent checking can reduce overall decision quality.",
+          "label": "counter"
+        },
+        {
+          "id": "C3",
+          "title": "Human AI verification workload logging implementation",
+          "abstract": "Synthetic logging architecture without outcome evaluation.",
+          "label": "context"
+        },
+        {
+          "id": "C4",
+          "title": "Warehouse robot routes",
+          "abstract": "Synthetic motion planning.",
+          "label": "unrelated"
+        }
+      ]
+    },
+    {
+      "id": "research-history",
+      "question": "研究エージェントは主張の撤回と根拠の不確実性を公開すべきか",
+      "terms": [
+        "research agents",
+        "uncertainty"
+      ],
+      "candidates": [
+        {
+          "id": "C1",
+          "title": "An audit trail for autonomous discovery",
+          "abstract": "Synthetic metadata about documenting abandoned hypotheses and changing evidential support.",
+          "label": "core"
+        },
+        {
+          "id": "C2",
+          "title": "Why exploratory failures should remain private",
+          "abstract": "Synthetic counterargument about disclosure costs and misleading unfinished hypotheses.",
+          "label": "counter"
+        },
+        {
+          "id": "C3",
+          "title": "Research agents uncertainty dashboard styling",
+          "abstract": "Synthetic interface styling only.",
+          "label": "context"
+        },
+        {
+          "id": "C4",
+          "title": "Submarine control systems",
+          "abstract": "Synthetic underwater actuation.",
+          "label": "unrelated"
+        }
+      ]
+    }
+  ]
+}

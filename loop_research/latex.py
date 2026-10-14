@@ -24,6 +24,7 @@ def render(store, artifact, status, current):
              r'\begin{quote}\small Research status: ' + escape(status) + '. '
              + ('Current research draft. Internal AI review is not academic approval.' if current else 'Historical or incomplete output; do not treat as the current research conclusion.') + r'\end{quote}']
     trace, manual = [], {}
+    metadata_trace = [{'block_id': 'MT001', 'text': title, 'tex_first_line': 7, 'tex_last_line': 7}] if content else []
     def block_text(block):
         keys = []
         for eid in block['evidence_ids']:
@@ -48,12 +49,17 @@ def render(store, artifact, status, current):
         for block in content['abstract_blocks']:
             block_text(block)
         lines.append(r'\end{abstract}')
-        for section in content['sections']:
+        for i, section in enumerate(content['sections'], 1):
             lines.append(r'\section{' + escape(section['heading']) + '}')
+            metadata_trace.append({'block_id': f'MH{i:03}', 'text': section['heading'],
+                                   'tex_first_line': len(lines), 'tex_last_line': len(lines)})
             for block in section['blocks']:
                 block_text(block)
         lines.extend([r'\section*{Outstanding uncertainties}', r'\begin{itemize}'])
-        lines.extend(r'\item ' + escape(value) for value in content['uncertainties'])
+        for i, value in enumerate(content['uncertainties'], 1):
+            lines.append(r'\item ' + escape(value))
+            metadata_trace.append({'block_id': f'MU{i:03}', 'text': value,
+                                   'tex_first_line': len(lines), 'tex_last_line': len(lines)})
         lines.append(r'\end{itemize}')
     else:
         lines.append('No manuscript has been produced.')
@@ -64,12 +70,12 @@ def render(store, artifact, status, current):
     for entry in lines:
         physical_lines.append(offset)
         offset += entry.count('\n') + 1
-    for item in trace:
+    for item in trace + metadata_trace:
         first, last = item['tex_first_line'] - 1, item['tex_last_line'] - 1
         item['tex_first_line'] = physical_lines[first]
         item['tex_last_line'] = physical_lines[last] + lines[last].count('\n')
     return '\n'.join(lines) + '\n', {'draft_id': artifact['id'] if artifact else None, 'current': current,
-                                    'status': status, 'blocks': trace,
+                                    'status': status, 'blocks': trace, 'metadata_targets': metadata_trace,
                                     'notice': 'TeX line locations refer to this export only. Edit the structured manuscript and reverify changes; editing TeX does not update the research ledger.'}, manual
 
 

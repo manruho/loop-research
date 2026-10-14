@@ -9,11 +9,13 @@ from .common import ResearchError, identifier, label, now, required
 ARTIFACT_PREFIXES = {
     "orientation": "N", "reading": "L", "comparison": "K",
     "outline": "O", "draft": "A", "review": "V", "verify": "U", "decision": "J", "redesign": "Z",
+    "selection": "Y",
 }
 PREFIX_KINDS = {value: key for key, value in ARTIFACT_PREFIXES.items()}
 DEFAULT_SETTINGS = {"provider": "arxiv", "paper_limit": 12, "pages_per_document": 2,
                     "query_limit": 6, "search_budget": 12, "model": None, "timeout": 180, "reasoning_effort": "medium", "review_model": None, "review_effort": "low",
-                    "citation_seeds": 3, "citation_limit": 10, "citation_budget": 30}
+                    "citation_seeds": 3, "citation_limit": 10, "citation_budget": 30,
+                    "draft_checkpoint_readings": 2, "semantic_selection": 1}
 OWNER_SCHEMA = """
 ALTER TABLE searches ADD COLUMN owner_pid INTEGER;
 ALTER TABLE searches ADD COLUMN owner_identity TEXT;
@@ -123,6 +125,9 @@ class WorkflowStore:
                 raise ResearchError("検索先が不正です。")
             for key, maximum in (("paper_limit", 20), ("pages_per_document", 20), ("query_limit", 10), ("search_budget", 100), ("citation_seeds", 10), ("citation_limit", 20), ("citation_budget", 100)):
                 if type(merged[key]) is not int or not (0 if key.startswith("citation_") else 1) <= merged[key] <= maximum:
+                    raise ResearchError(f"{key}が有効な範囲にありません。")
+            for key, maximum in (("draft_checkpoint_readings", 20), ("semantic_selection", 1)):
+                if type(merged[key]) is not int or not 0 <= merged[key] <= maximum:
                     raise ResearchError(f"{key}が有効な範囲にありません。")
             if merged["review_effort"] not in ("low", "medium", "high", "xhigh", "max", "ultra"):
                 raise ResearchError("査読の推論の強さが不正です。")
@@ -430,6 +435,11 @@ class WorkflowStore:
         status = {"proceed": "active", "consult": "needs_human", "hold": "held"}[result["recommendation"]]
         self._set_study(result["reason"], status=status, phase="literature")
 
+    def apply_selection(self, tid, key, data, result):
+        self._artifact('selection', key, tid, data, result)
+        self.event('study.selection', '意味的選別を暫定記録。原文の読解・科学的支持とは区別。',
+                   {'target': data['target'], 'task_id': label(tid, 'T')})
+
     def apply_reading(self, tid, key, data, result):
         doc = self.document_row(data["document_id"])
         paper = self.paper_row(label(doc["paper_id"], "P"))
@@ -528,7 +538,10 @@ class WorkflowStore:
             self.event("issue.reassessed", assessment["reason"], {"issue_id": assessment["issue_id"],
                        "review_id": review, "status": status, "remaining_uncertainty": assessment["remaining_uncertainty"]})
         if result["decision"] == "ready_for_human":
-            self._set_study(result["synthesis"], status="ready_for_human", phase="human_review")
+            if data.get('discovery_deferred'):
+                self._set_study('暫定草稿の査読を記録。予算内で保留した探索へ戻る。', status='active', phase='literature')
+            else:
+                self._set_study(result["synthesis"], status="ready_for_human", phase="human_review")
         elif result["decision"] == "hold":
             self._set_study(result["synthesis"], status="needs_human", phase="review")
         elif result["decision"] == "withdraw":

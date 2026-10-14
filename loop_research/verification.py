@@ -12,13 +12,21 @@ VERIFY = obj(
                     verdict=string(("supported", "partial", "contradicted", "undetermined")),
                     reason=TEXT, qualification=string(maximum=2000)), maximum=150),
     coverage=array(obj(block_id=string(minimum=1, maximum=30),
-                       status=string(("complete", "no_facts", "incomplete")), reason=TEXT), minimum=1, maximum=88),
+                       status=string(("complete", "no_facts", "incomplete")), reason=TEXT), minimum=1, maximum=110),
     ledger_claims=array(ledger.CLAIM, maximum=150),
     ledger_coverage=array(obj(block_id=string(minimum=1, maximum=30),
-                              status=string(("complete", "no_facts", "incomplete")), reason=TEXT), minimum=1, maximum=88),
+                              status=string(("complete", "no_facts", "incomplete")), reason=TEXT), minimum=1, maximum=110),
     limitations=array(TEXT, minimum=1, maximum=12),
 )
 PROMPT = (
+    "Inspect MT001 (title), every MH target (heading), and every MU target (uncertainties); verification_targets enumerates all prose. "
+    "source_path resolves inside draft.content; string targets use field=text and qualification is empty. "
+    "Preserve the complete proposition, negation, temporal scope and qualifications. A quoted older count "
+    "explicitly superseded is not an assertion of the current count. Never extract only a number and omit "
+    "the sentence's denial. Each comparison must correspond to what the sentence actually asserts. "
+    "Assess population, experimental vs observational design, effect direction, modality, measurements "
+    "and operational conditions separately. Missing limiting conditions require partial/undetermined "
+    "and explanation even when the source quote matches verbatim. "
     "Extract EVERY empirically checkable assertion presented as fact, including factual claims about sources or studies, from ALL manuscript blocks, including those "
     "labeled position or hypothesis when the label hides an asserted empirical claim. Exclude clearly "
     "identified conjectures, normative/value premises, stipulated definitions and analytic/logical "
@@ -80,9 +88,9 @@ def locate(text, quote, occurrence=1):
 
 def normalize(data, result):
     import copy
-    from .roles import blocks
+    from .roles import verification_blocks
     result = copy.deepcopy(result)
-    manuscript = {b["id"]: b for b in blocks(data["draft"]["content"])}
+    manuscript = {b["id"]: b for b in verification_blocks(data["draft"]["content"])}
     coverage = result["coverage"]
     if len({c["block_id"] for c in coverage}) != len(coverage) or {c["block_id"] for c in coverage} != set(manuscript):
         raise ResearchError("すべての段落の事実抽出範囲を記録してください。")
@@ -111,6 +119,7 @@ def normalize(data, result):
             raise ResearchError("事実主張のIDが重複しています。")
         ids.add(fact["id"])
         fact["model_verdict"] = fact["verdict"]
+        fact['context_id'] = fact['block_id'] + '.' + fact['field']
         fact["host_adjustments"] = []
         try:
             fact["start"], fact["end"] = locate(manuscript[fact["block_id"]][fact["field"]], fact["text"], fact["occurrence"])
@@ -152,6 +161,8 @@ def normalize(data, result):
             item["status"] = "incomplete"
             item["host_adjustments"] = ["fact-labeled block has no extracted assertions"]
             item["reason"] = "Host coverage gate: fact-labeled block has no extracted assertions. " + item["reason"]
+    result['assertion_contexts'] = {f['context_id']: manuscript[f['block_id']][f['field']]
+                                    for f in result['facts'] + result['ledger_claims']}
     return result
 
 

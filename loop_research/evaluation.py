@@ -18,6 +18,8 @@ from .schema import obj, array, string, validate
 FACT_EXTRACTION = obj(facts=array(string(minimum=1, maximum=1800), maximum=150),
                       limitations=array(string(minimum=1), minimum=1, maximum=12))
 RUBRIC = ("prior_work", "argument", "counterarguments", "qualification", "traceability")
+VARIANTS = {'harness': {}, 'harness-no-checkpoint': {'draft_checkpoint_readings': 0},
+            'harness-lexical': {'semantic_selection': 0}, 'harness-no-citations': {'citation_seeds': 0}}
 
 
 def read(path):
@@ -96,7 +98,7 @@ def baseline(case, root, model, seconds):
             "scope": "Normal Codex with web search and workspace-write in isolated evaluation directory"}
 
 
-def harness(case, root, model, review_model, seconds):
+def harness(case, root, model, review_model, seconds, overrides=None):
     from .store import ResearchStore
     from .literature import register_paper
     from .workflow import ResearchWorkflow
@@ -105,7 +107,9 @@ def harness(case, root, model, review_model, seconds):
     start = time.monotonic()
     try:
         store.init(case["question"])
-        store.configure_study("Predeclared pilot models", settings={"model": model, "review_model": review_model, "timeout": 240})
+        settings = {"model": model, "review_model": review_model, "timeout": 240}
+        settings.update(overrides or {})
+        store.configure_study("Predeclared pilot models and ablation", settings=settings)
         register_paper(store, title=case["seed"]["title"], arxiv=case["seed"]["arxiv"])
         result = ResearchWorkflow(store).run(200, max_seconds=seconds)
         exported = export_study(store, root / "export")
@@ -115,6 +119,7 @@ def harness(case, root, model, review_model, seconds):
             (root / "no-paper.txt").write_text(result["state"]["reason"])
         tasks = [store.show_task(t["id"]) for t in store.list_tasks()]
         return {"status": result["state"]["status"], "elapsed_seconds": time.monotonic()-start,
+                'phase_metrics': phase_metrics(store), 'settings': store.study_state()['settings'],
                 "usage": [t["execution"].get("usage") for t in tasks if t["execution"]],
                 "task_count": len(tasks), "papers": len(store.list_papers()),
                 "searches": len(store.list_searches()), "reading_scope": result["scope"],
@@ -132,6 +137,10 @@ def run_evaluation(output, cases_path, model, review_model, seconds=1800, resume
     if not model or not review_model or model == review_model:
         raise ResearchError("評価にも異なる執筆・査読モデルを明示してください。")
     spec = load_cases(cases_path)
+    methods = list(methods or ('baseline', 'harness'))
+    if len(methods) != len(set(methods)) or not methods or not set(methods) <= {'baseline', *VARIANTS}:
+        raise ResearchError('評価方式に重複または未知の方式があります。')
+    source_hashes = {p.name: hashlib.sha256(p.read_bytes()).hexdigest() for p in Path(__file__).parent.glob('*.py')}
     root = Path(output).expanduser().resolve()
     spec_hash = hashlib.sha256(Path(cases_path).read_bytes()).hexdigest()
     if root.exists() and not resume:
@@ -144,15 +153,19 @@ def run_evaluation(output, cases_path, model, review_model, seconds=1800, resume
         manifest = read(manifest_path) if manifest_path.exists() else {
             "created_at": now(), "cases": spec, "cases_sha256": spec_hash, "model": model, "review_model": review_model,
             "seconds_per_run": seconds, "runs": [], "human_evaluation": "pending",
+            'methods': methods, 'source_sha256': source_hashes,
             "limitations": ["3 cases, 1 run per method; no statistical or general superiority claim.",
                              "Different tools and aggregate model usage; model diversity is a confound.",
                              "Reference-set membership and AI extraction are not human ground truth."]}
         if (manifest["model"], manifest["review_model"], manifest["cases_sha256"], manifest["seconds_per_run"]) != (model, review_model, spec_hash, seconds):
             raise ResearchError("再開のモデル・課題・予算が評価開始時と違います。")
+        if manifest.get('methods', ['baseline', 'harness']) != methods or manifest.get('source_sha256', source_hashes) != source_hashes:
+            raise ResearchError('再開の方式または実装が評価開始時と違います。別の出力先で比較してください。')
         save(manifest_path, manifest)
         for case in spec["cases"]:
             # Counterbalance method order across cases, predeclared before outcomes.
-            order = ("baseline", "harness") if spec["cases"].index(case) % 2 == 0 else ("harness", "baseline")
+            shift = spec['cases'].index(case) % len(methods)
+            order = methods[shift:] + methods[:shift]
             for method in order:
                 if methods and method not in methods:
                     continue
@@ -161,7 +174,7 @@ def run_evaluation(output, cases_path, model, review_model, seconds=1800, resume
                 destination = root / (case["id"] + "-" + method)
                 if destination.exists():
                     database = destination / "study.sqlite3"
-                    if method == "harness" and database.exists():
+                    if method in VARIANTS and database.exists():
                         from .store import ResearchStore
                         from .workflow import ResearchWorkflow
                         store = ResearchStore(database)
@@ -182,7 +195,7 @@ def run_evaluation(output, cases_path, model, review_model, seconds=1800, resume
                 print(case["id"] + " " + method + " started", flush=True)
                 try:
                     result = (baseline(case, destination, model, seconds) if method == "baseline"
-                              else harness(case, destination, model, review_model, seconds))
+                              else harness(case, destination, model, review_model, seconds, VARIANTS[method]))
                 except KeyboardInterrupt:
                     result = {"status": "interrupted", "elapsed_seconds": time.monotonic()-started}
                     manifest["runs"].append(dict(result, case_id=case["id"], method=method, path=destination.name, source_sha256=source_hashes))
@@ -208,9 +221,9 @@ def anonymize(text, record_ids=()):
 def packet(output, reviewer_model):
     root = Path(output).resolve()
     manifest = read(root / "manifest.json")
-    expected = {(case["id"], method) for case in manifest["cases"]["cases"] for method in ("baseline", "harness")}
-    if len(manifest["runs"]) != 6 or {(run["case_id"], run["method"]) for run in manifest["runs"]} != expected:
-        raise ResearchError("3課題×2方式の終了記録が揃ってから評価票を作成してください。")
+    expected = {(case['id'], method) for case in manifest['cases']['cases'] for method in manifest.get('methods', ['baseline', 'harness'])}
+    if len(manifest['runs']) != len(expected) or {(run['case_id'], run['method']) for run in manifest['runs']} != expected:
+        raise ResearchError('全課題×宣言済み方式の終了記録が揃ってから評価票を作成してください。')
     target = root / "blind-packet"
     if target.exists():
         raise ResearchError("評価票は既存です。上書きしません。")
@@ -350,6 +363,60 @@ def identifiers(text):
     return found
 
 
+def phase_metrics(store):
+    """Observed wall time and CLI-reported usage, including failed calls."""
+    from datetime import datetime
+    phases, first, first_calls = {}, None, None
+    starts = []
+    for index, entry in enumerate(store.list_tasks(), 1):
+        task = store.show_task(entry['id'])
+        start = datetime.fromisoformat(task['started_at'])
+        starts.append(start)
+        row = phases.setdefault(task['kind'], {'calls': 0, 'seconds': 0.0, 'failed': 0})
+        row['calls'] += 1
+        row['failed'] += task['status'] != 'completed'
+        if task['finished_at']:
+            end = datetime.fromisoformat(task['finished_at'])
+            row['seconds'] += max(0, (end - start).total_seconds())
+            if task['kind'] == 'draft' and task['status'] == 'completed' and first is None:
+                first = end
+                first_calls = index
+    usages = [(store.show_task(t['id']).get('execution') or {}).get('usage') for t in store.list_tasks()]
+    totals = {}
+    for usage in usages:
+        if isinstance(usage, dict):
+            for k, value in usage.items():
+                if type(value) is int:
+                    totals[k] = totals.get(k, 0) + value
+    return {'phases': phases, 'seconds_to_first_draft': (first - min(starts)).total_seconds() if first and starts else None,
+            'calls_to_first_draft': first_calls,
+            'reported_usage': totals, 'usage_unavailable_calls': sum(not isinstance(u, dict) or not u for u in usages),
+            'notice': 'CLI-reported tokens; missing usage is unknown, not zero. No inference compute estimate.'}
+
+
+def selection_metrics(cases, ranking, k):
+    """Limited annotated reference sets; never infer unread sources from ranking."""
+    if type(k) is not int or k < 1:
+        raise ResearchError('kは正の整数です。')
+    expected = {c['id']: c for c in cases}
+    if len(expected) != len(cases) or set(ranking) != set(expected):
+        raise ResearchError('選別評価の課題IDに欠落・重複・未知の項目があります。')
+    rows = []
+    for cid, case in expected.items():
+        ids = ranking[cid]
+        pool = {p['id'] for p in case['candidates']}
+        if len(ids) != len(set(ids)) or not set(ids) <= pool:
+            raise ResearchError('ランキングに重複または未知の候補があります。')
+        relevant = {p['id'] for p in case['candidates'] if p['label'] in ('core', 'counter')}
+        counter = {p['id'] for p in case['candidates'] if p['label'] == 'counter'}
+        top = set(ids[:k])
+        rows.append({'case_id': cid, 'k': k, 'selected': ids[:k], 'candidate_count': len(pool),
+                     'recall_at_k': len(top & relevant) / len(relevant) if relevant else None,
+                     'precision_at_k': len(top & relevant) / len(top) if top else 0.0,
+                     'counter_recall_at_k': len(top & counter) / len(counter) if counter else None})
+    return {'cases': rows, 'notice': 'Limited developer annotations, not independent relevance truth or discovery completeness.'}
+
+
 def metrics(root, run, case):
     path = root / run["path"]
     draft = path / "draft.md"
@@ -368,6 +435,12 @@ def metrics(root, run, case):
             for row in conn.execute("SELECT doi,url,external_id FROM papers"):
                 observed.update(identifiers(" ".join(str(x) for x in row)))
             result["expected_discovered_in_ledger"] = sorted(expected & observed)
+            read_ids = set()
+            for row in conn.execute("SELECT p.doi,p.url,p.external_id FROM papers p JOIN documents d ON d.paper_id=p.id JOIN artifacts a ON a.kind='reading' AND CAST(SUBSTR(json_extract(a.input_json,'$.document_id'),2) AS INTEGER)=d.id"):
+                read_ids.update(identifiers(' '.join(str(x) for x in row)))
+            result['expected_read_in_ledger'] = sorted(expected & read_ids)
+            result['reference_discovery_recall'] = len(expected & observed) / len(expected) if expected else None
+            result['reference_reading_recall'] = len(expected & read_ids) / len(expected) if expected else None
             result["fetched_documents"] = conn.execute("SELECT COUNT(*) FROM documents WHERE status='extracted'").fetchone()[0]
             result["discovery_attempts"] = [dict(zip(("provider", "status", "count"), r)) for r in conn.execute("SELECT provider,status,COUNT(*) FROM searches GROUP BY provider,status")]
             latest = conn.execute("SELECT id FROM artifacts WHERE kind='verify' ORDER BY id DESC LIMIT 1").fetchone()
@@ -383,6 +456,37 @@ def report(output):
     manifest = read(root / "manifest.json")
     observed_runs = [dict(run, metrics=metrics(root, run, next(c for c in manifest["cases"]["cases"] if c["id"] == run["case_id"]))) for run in manifest["runs"]]
     result = {"human_evaluation": manifest["human_evaluation"], "limitations": manifest["limitations"], "runs": observed_runs}
+    def usage(run):
+        phases = run.get('phase_metrics')
+        if phases:
+            return phases['reported_usage'] if not phases['usage_unavailable_calls'] else None
+        values = run.get('usage')
+        if not values or any(not isinstance(v, dict) or not v for v in values):
+            return None
+        totals = {}
+        for value in values:
+            for key, count in value.items():
+                if type(count) is int:
+                    totals[key] = totals.get(key, 0) + count
+        return totals
+    comparisons = []
+    for case in manifest['cases']['cases']:
+        rows = {r['method']: r for r in observed_runs if r['case_id'] == case['id']}
+        for anchor in ('baseline', 'harness'):
+            if anchor not in rows:
+                continue
+            for method, run in rows.items():
+                if method == anchor or (anchor == 'harness' and method == 'baseline'):
+                    continue
+                before, after = usage(rows[anchor]), usage(run)
+                comparisons.append({'case_id': case['id'], 'anchor': anchor, 'method': method,
+                                    'elapsed_delta_seconds': (run['elapsed_seconds'] - rows[anchor]['elapsed_seconds'])
+                                    if 'elapsed_seconds' in run and 'elapsed_seconds' in rows[anchor] else None,
+                                    'status_pair': [rows[anchor]['status'], run['status']],
+                                    'reported_usage_delta': {key: after[key] - before[key] for key in before.keys() & after.keys()}
+                                    if before is not None and after is not None else None,
+                                    'notice': 'Paired descriptive difference only; failure and missing manuscripts must be retained.'})
+    result['paired_observations'] = comparisons
     if manifest.get("human_scores"):
         mapping = read(root / "private-sample-map.json")
         result["human_scores"] = [dict(s, **mapping[s["sample_id"]]) for s in read(root / manifest["human_scores"])["samples"]]
