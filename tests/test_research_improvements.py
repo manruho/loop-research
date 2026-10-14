@@ -171,6 +171,7 @@ class ResearchImprovements(unittest.TestCase):
         with patch('loop_research.evaluation.baseline', fake), patch('loop_research.evaluation.harness', fake), contextlib.redirect_stdout(io.StringIO()):
             run_evaluation(output, 'benchmarks/position-papers.json', 'writer', 'reviewer', 1, methods=methods)
             run_evaluation(output, 'benchmarks/position-papers.json', 'writer', 'reviewer', 1, resume=True, methods=methods)
+
         manifest = json.loads((output / 'manifest.json').read_text())
         self.assertEqual(len(manifest['runs']), 9)
         self.assertFalse(any('verify' in k or 'review' in k for v in VARIANTS.values() for k in v))
@@ -180,6 +181,15 @@ class ResearchImprovements(unittest.TestCase):
         (output / 'manifest.json').write_text(json.dumps(manifest))
         with self.assertRaises(ResearchError):
             run_evaluation(output, 'benchmarks/position-papers.json', 'writer', 'reviewer', 1, resume=True, methods=methods)
+
+    def test_single_case_pilot_is_supported_without_duplicating_the_question(self):
+        from loop_research.evaluation import load_cases
+        spec = json.loads(Path('benchmarks/benchmark-reporting-pilot.json').read_text())
+        self.assertEqual(len(load_cases('benchmarks/benchmark-reporting-pilot.json')['cases']), 1)
+        for cases in ([], spec['cases'] * 2, [dict(spec['cases'][0], seed={})]):
+            path = self.root / 'bad-cases.json'
+            path.write_text(json.dumps({'cases': cases}))
+            with self.assertRaises(ResearchError): load_cases(path)
 
     def test_checkpoint_reaches_draft_earlier_and_then_resumes_reading(self):
         outcomes = {}

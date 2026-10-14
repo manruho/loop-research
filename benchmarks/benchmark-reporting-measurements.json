@@ -1,0 +1,516 @@
+{
+  "date": "2026-10-14",
+  "notice": "One question, one run per arm; human scoring pending. Identifier metrics are not relevance or support. Missing usage is unknown. Raw manuscripts and databases remain private.",
+  "cases_sha256": "d0ccc81d996c7cf5f32b71fa31a61b4e5aa2a976e96227fcd72e6065b0388673",
+  "initial_commit": "28ff7ddafab1ed2bcb704962e6228a0f7927706a",
+  "repair_commit": "9e2542bc497814ea516ff3b33d63e1436f9e364f",
+  "initial_runs": [
+    {
+      "method": "baseline",
+      "status": "completed",
+      "elapsed_seconds": 230.34111810097238,
+      "phase_metrics": null,
+      "draft_available": true,
+      "reported_usage_events": [
+        {
+          "input_tokens": 405673,
+          "cached_input_tokens": 343168,
+          "cache_write_input_tokens": 0,
+          "output_tokens": 4469,
+          "reasoning_output_tokens": 436
+        }
+      ],
+      "identifier_metrics": {
+        "expected_reference_count": 7,
+        "expected_in_final_manuscript": [
+          "arxiv:1810.03993",
+          "arxiv:2211.09110"
+        ],
+        "identifiable_final_citation_ids": [
+          "acl:2020.emnlp-main.393",
+          "acl:2021.acl-long.81",
+          "acl:2024.tacl-1.9",
+          "arxiv:1810.03993",
+          "arxiv:2111.15366",
+          "arxiv:2211.09110",
+          "arxiv:2310.11324"
+        ],
+        "scope": "Identifier matching only. Missing identifiers are not proof that a paper was unread; relevance and support require human evaluation."
+      }
+    },
+    {
+      "method": "harness",
+      "status": "budget_exhausted",
+      "elapsed_seconds": 600.3218515929766,
+      "phase_metrics": {
+        "phases": {
+          "orientation": {
+            "calls": 1,
+            "seconds": 38.0,
+            "failed": 0
+          },
+          "selection": {
+            "calls": 4,
+            "seconds": 508.0,
+            "failed": 0
+          },
+          "reading": {
+            "calls": 1,
+            "seconds": 30.0,
+            "failed": 0
+          },
+          "exploration": {
+            "calls": 1,
+            "seconds": 2.0,
+            "failed": 1
+          }
+        },
+        "seconds_to_first_draft": null,
+        "calls_to_first_draft": null,
+        "reported_usage": {
+          "cache_write_input_tokens": 0,
+          "cached_input_tokens": 0,
+          "input_tokens": 114945,
+          "output_tokens": 18636,
+          "reasoning_output_tokens": 386
+        },
+        "usage_unavailable_calls": 1,
+        "notice": "CLI-reported tokens; missing usage is unknown, not zero. No inference compute estimate."
+      },
+      "draft_available": false,
+      "reported_usage_events": [
+        {
+          "cache_write_input_tokens": 0,
+          "cached_input_tokens": 0,
+          "input_tokens": 11989,
+          "output_tokens": 1284,
+          "reasoning_output_tokens": 65
+        },
+        {
+          "cache_write_input_tokens": 0,
+          "cached_input_tokens": 0,
+          "input_tokens": 17761,
+          "output_tokens": 2957,
+          "reasoning_output_tokens": 82
+        },
+        {
+          "cache_write_input_tokens": 0,
+          "cached_input_tokens": 0,
+          "input_tokens": 19645,
+          "output_tokens": 3400,
+          "reasoning_output_tokens": 67
+        },
+        {
+          "cache_write_input_tokens": 0,
+          "cached_input_tokens": 0,
+          "input_tokens": 20186,
+          "output_tokens": 3667,
+          "reasoning_output_tokens": 67
+        },
+        {
+          "cache_write_input_tokens": 0,
+          "cached_input_tokens": 0,
+          "input_tokens": 32372,
+          "output_tokens": 6269,
+          "reasoning_output_tokens": 105
+        },
+        {
+          "cache_write_input_tokens": 0,
+          "cached_input_tokens": 0,
+          "input_tokens": 12992,
+          "output_tokens": 1059,
+          "reasoning_output_tokens": 0
+        }
+      ],
+      "identifier_metrics": {
+        "expected_reference_count": 7,
+        "expected_in_final_manuscript": [],
+        "identifiable_final_citation_ids": [],
+        "scope": "Identifier matching only. Missing identifiers are not proof that a paper was unread; relevance and support require human evaluation.",
+        "expected_discovered_in_ledger": [
+          "arxiv:2211.09110"
+        ],
+        "expected_read_in_ledger": [
+          "arxiv:2211.09110"
+        ],
+        "reference_discovery_recall": 0.14285714285714285,
+        "reference_reading_recall": 0.14285714285714285,
+        "fetched_documents": 1,
+        "discovery_attempts": [
+          {
+            "provider": "arxiv",
+            "status": "completed",
+            "count": 2
+          },
+          {
+            "provider": "openalex",
+            "status": "completed",
+            "count": 6
+          }
+        ],
+        "native_fact_verdicts": null,
+        "native_verification_scope": "Harness AI judgments only, not an independently comparable quality score or human ground truth."
+      }
+    },
+    {
+      "method": "harness-no-checkpoint",
+      "status": "budget_exhausted",
+      "elapsed_seconds": 600.5404737210483,
+      "phase_metrics": {
+        "phases": {
+          "orientation": {
+            "calls": 1,
+            "seconds": 42.0,
+            "failed": 0
+          },
+          "selection": {
+            "calls": 3,
+            "seconds": 479.0,
+            "failed": 0
+          },
+          "reading": {
+            "calls": 2,
+            "seconds": 52.0,
+            "failed": 1
+          }
+        },
+        "seconds_to_first_draft": null,
+        "calls_to_first_draft": null,
+        "reported_usage": {
+          "cache_write_input_tokens": 0,
+          "cached_input_tokens": 0,
+          "input_tokens": 105526,
+          "output_tokens": 17963,
+          "reasoning_output_tokens": 396
+        },
+        "usage_unavailable_calls": 1,
+        "notice": "CLI-reported tokens; missing usage is unknown, not zero. No inference compute estimate."
+      },
+      "draft_available": false,
+      "reported_usage_events": [
+        {
+          "cache_write_input_tokens": 0,
+          "cached_input_tokens": 0,
+          "input_tokens": 11993,
+          "output_tokens": 1139,
+          "reasoning_output_tokens": 43
+        },
+        {
+          "cache_write_input_tokens": 0,
+          "cached_input_tokens": 0,
+          "input_tokens": 24243,
+          "output_tokens": 4887,
+          "reasoning_output_tokens": 120
+        },
+        {
+          "cache_write_input_tokens": 0,
+          "cached_input_tokens": 0,
+          "input_tokens": 23928,
+          "output_tokens": 4699,
+          "reasoning_output_tokens": 91
+        },
+        {
+          "cache_write_input_tokens": 0,
+          "cached_input_tokens": 0,
+          "input_tokens": 32370,
+          "output_tokens": 6214,
+          "reasoning_output_tokens": 82
+        },
+        {
+          "cache_write_input_tokens": 0,
+          "cached_input_tokens": 0,
+          "input_tokens": 12992,
+          "output_tokens": 1024,
+          "reasoning_output_tokens": 60
+        }
+      ],
+      "identifier_metrics": {
+        "expected_reference_count": 7,
+        "expected_in_final_manuscript": [],
+        "identifiable_final_citation_ids": [],
+        "scope": "Identifier matching only. Missing identifiers are not proof that a paper was unread; relevance and support require human evaluation.",
+        "expected_discovered_in_ledger": [
+          "arxiv:1810.03993",
+          "arxiv:2211.09110"
+        ],
+        "expected_read_in_ledger": [
+          "arxiv:2211.09110"
+        ],
+        "reference_discovery_recall": 0.2857142857142857,
+        "reference_reading_recall": 0.14285714285714285,
+        "fetched_documents": 1,
+        "discovery_attempts": [
+          {
+            "provider": "arxiv",
+            "status": "completed",
+            "count": 2
+          },
+          {
+            "provider": "crossref",
+            "status": "completed",
+            "count": 2
+          },
+          {
+            "provider": "openalex",
+            "status": "completed",
+            "count": 8
+          }
+        ],
+        "native_fact_verdicts": null,
+        "native_verification_scope": "Harness AI judgments only, not an independently comparable quality score or human ground truth."
+      }
+    }
+  ],
+  "post_fix_runs": [
+    {
+      "method": "harness",
+      "status": "budget_exhausted",
+      "elapsed_seconds": 600.4971607759944,
+      "phase_metrics": {
+        "phases": {
+          "orientation": {
+            "calls": 1,
+            "seconds": 45.0,
+            "failed": 0
+          },
+          "selection": {
+            "calls": 2,
+            "seconds": 95.0,
+            "failed": 0
+          },
+          "reading": {
+            "calls": 1,
+            "seconds": 35.0,
+            "failed": 0
+          },
+          "exploration": {
+            "calls": 1,
+            "seconds": 102.0,
+            "failed": 0
+          },
+          "comparison": {
+            "calls": 1,
+            "seconds": 70.0,
+            "failed": 0
+          },
+          "outline": {
+            "calls": 1,
+            "seconds": 150.0,
+            "failed": 0
+          },
+          "draft": {
+            "calls": 1,
+            "seconds": 91.0,
+            "failed": 0
+          },
+          "verify": {
+            "calls": 1,
+            "seconds": 3.0,
+            "failed": 1
+          }
+        },
+        "seconds_to_first_draft": 597.0,
+        "calls_to_first_draft": 8,
+        "reported_usage": {
+          "cache_write_input_tokens": 0,
+          "cached_input_tokens": 0,
+          "input_tokens": 142446,
+          "output_tokens": 19197,
+          "reasoning_output_tokens": 618
+        },
+        "usage_unavailable_calls": 1,
+        "notice": "CLI-reported tokens; missing usage is unknown, not zero. No inference compute estimate."
+      },
+      "draft_available": true,
+      "reported_usage_events": [
+        {
+          "cache_write_input_tokens": 0,
+          "cached_input_tokens": 0,
+          "input_tokens": 11995,
+          "output_tokens": 1154,
+          "reasoning_output_tokens": 82
+        },
+        {
+          "cache_write_input_tokens": 0,
+          "cached_input_tokens": 0,
+          "input_tokens": 17690,
+          "output_tokens": 1526,
+          "reasoning_output_tokens": 148
+        },
+        {
+          "cache_write_input_tokens": 0,
+          "cached_input_tokens": 0,
+          "input_tokens": 17629,
+          "output_tokens": 1126,
+          "reasoning_output_tokens": 103
+        },
+        {
+          "cache_write_input_tokens": 0,
+          "cached_input_tokens": 0,
+          "input_tokens": 12992,
+          "output_tokens": 1098,
+          "reasoning_output_tokens": 34
+        },
+        {
+          "cache_write_input_tokens": 0,
+          "cached_input_tokens": 0,
+          "input_tokens": 16930,
+          "output_tokens": 3324,
+          "reasoning_output_tokens": 68
+        },
+        {
+          "cache_write_input_tokens": 0,
+          "cached_input_tokens": 0,
+          "input_tokens": 24200,
+          "output_tokens": 2376,
+          "reasoning_output_tokens": 37
+        },
+        {
+          "cache_write_input_tokens": 0,
+          "cached_input_tokens": 0,
+          "input_tokens": 17820,
+          "output_tokens": 5033,
+          "reasoning_output_tokens": 97
+        },
+        {
+          "cache_write_input_tokens": 0,
+          "cached_input_tokens": 0,
+          "input_tokens": 23190,
+          "output_tokens": 3560,
+          "reasoning_output_tokens": 49
+        }
+      ],
+      "identifier_metrics": {
+        "expected_reference_count": 7,
+        "expected_in_final_manuscript": [
+          "arxiv:2211.09110"
+        ],
+        "identifiable_final_citation_ids": [
+          "arxiv:2211.09110"
+        ],
+        "scope": "Identifier matching only. Missing identifiers are not proof that a paper was unread; relevance and support require human evaluation.",
+        "expected_discovered_in_ledger": [
+          "arxiv:1810.03993",
+          "arxiv:2211.09110"
+        ],
+        "expected_read_in_ledger": [
+          "arxiv:2211.09110"
+        ],
+        "reference_discovery_recall": 0.2857142857142857,
+        "reference_reading_recall": 0.14285714285714285,
+        "fetched_documents": 1,
+        "discovery_attempts": [
+          {
+            "provider": "arxiv",
+            "status": "completed",
+            "count": 2
+          }
+        ],
+        "native_fact_verdicts": null,
+        "native_verification_scope": "Harness AI judgments only, not an independently comparable quality score or human ground truth."
+      }
+    }
+  ],
+  "initial_runs_source_sha256": {
+    "engine.py": "93b612cafed833731bce5f6cf41e18af9c58da641edb53c303c3e6a2260863dc",
+    "retrieval_eval.py": "d6a9983aba352af0c6446904d43b3acb12ef4694396909796341e8fb9d5643bc",
+    "__main__.py": "935a1c1166b0c1ea35a82256345000bf2c73ded718d77773bc27a71ecce28f7d",
+    "codex.py": "1fdc6b0cca20e5ae01b8506953ee0c68eb510a3ae45aa1990cfc21c3f6a5a39b",
+    "literature_store.py": "d53ff39c99241d785fd0676f2bc3be7d41dc759a1621cf5d72161dce19006ff7",
+    "workflow_store.py": "a09ff3d3311fab30c1f1cb057e7b1fb3f00f8eb9e155d27faafbed5f883eb296",
+    "runtime.py": "2ac63d09b3b9cc5976fe11ed2d58777c556b00269cb8fc41b64aad29fa53c638",
+    "discovery.py": "d3506f2626d649adec9199997defb6f97f1f35b4333626fe124079ada1ea5629",
+    "literature.py": "8089c30b0d123a909dabe68253e624cfd73d95b93d5f50b1043d5698213612fe",
+    "latex.py": "b88ba556e2289fc2c1829b3f0c98458197a754a727b909db5b23026b12fe9e39",
+    "cli.py": "acfa076e63c2ee3b6f341305a2793dcb19c528ff655703b8e6d8a293a1998dde",
+    "extraction_eval.py": "7822954a3585e1b86e193fc0f507a86e0d8e71a669de3c0f5c91fd0eca72dd08",
+    "store.py": "b324cbd636aeb126cef81b3ba3a8c7f98db19c1e07d4e1ee75987ba4c50b6217",
+    "common.py": "1a6e0cbe33f193dbb34b5803e15fd6224e59314931c5b717c5fa43f9624808d0",
+    "ledger.py": "d207d5733e634d805137274831dc6f9f8a21764a7ece1070651da9a5c792e2b2",
+    "export.py": "66c6e63ecf117046271a6c72ac0dfab6f7c385ec697f40810287fa9d5d0aa22b",
+    "__init__.py": "1ce818ca82e9e12583f82c17815970f3263632eb7b1fbf2c2332bf9a2dc1dc53",
+    "evaluation.py": "623ea74ab6da7d545958cf8801f4559b34ea5386a5f141904de2cd53440d1ea4",
+    "schema.py": "c455d210453ded546868f7406ddddcbf3d0172d5d4a2a4fb2d8076921de73a8f",
+    "roles.py": "73fc144b3d87dd990c69299d3e4ea84c065fc555eabbacc908eb13f41c44c06a",
+    "verification.py": "49005ff710648d6c4d74b19d275ec0597c60d8d03da67ec3c847518fa2d2e724",
+    "selection.py": "dc89662d8645d99b1e9e143da6d9fccb083f8179d6f2edd7b625a49759f80b69",
+    "quality_store.py": "0f0855ec80b8f2827c78bf51efe52bb6317420cbcdf4740f08de35636e48a819",
+    "workflow.py": "0b0e3655490c622909468e65c355f781acc5886278ab91198c931f0aaf160e03"
+  },
+  "post_fix_runs_source_sha256": {
+    "engine.py": "93b612cafed833731bce5f6cf41e18af9c58da641edb53c303c3e6a2260863dc",
+    "retrieval_eval.py": "d6a9983aba352af0c6446904d43b3acb12ef4694396909796341e8fb9d5643bc",
+    "__main__.py": "935a1c1166b0c1ea35a82256345000bf2c73ded718d77773bc27a71ecce28f7d",
+    "codex.py": "1fdc6b0cca20e5ae01b8506953ee0c68eb510a3ae45aa1990cfc21c3f6a5a39b",
+    "literature_store.py": "d53ff39c99241d785fd0676f2bc3be7d41dc759a1621cf5d72161dce19006ff7",
+    "workflow_store.py": "f5ed154ebc1653bbd69206f50dc5e83601c58b65dfbfb693167dd92399c3826d",
+    "runtime.py": "2ac63d09b3b9cc5976fe11ed2d58777c556b00269cb8fc41b64aad29fa53c638",
+    "discovery.py": "d3506f2626d649adec9199997defb6f97f1f35b4333626fe124079ada1ea5629",
+    "literature.py": "8089c30b0d123a909dabe68253e624cfd73d95b93d5f50b1043d5698213612fe",
+    "latex.py": "b88ba556e2289fc2c1829b3f0c98458197a754a727b909db5b23026b12fe9e39",
+    "cli.py": "c7dfb820a4718a73afa61a370f0279c6adefbb863c3663cbca6ddbf1e5dbe68e",
+    "extraction_eval.py": "7822954a3585e1b86e193fc0f507a86e0d8e71a669de3c0f5c91fd0eca72dd08",
+    "store.py": "b324cbd636aeb126cef81b3ba3a8c7f98db19c1e07d4e1ee75987ba4c50b6217",
+    "common.py": "1a6e0cbe33f193dbb34b5803e15fd6224e59314931c5b717c5fa43f9624808d0",
+    "ledger.py": "8ce4c3b4358cd84df48e3c3b0b8020d303029170665bb883608da0aa5df23620",
+    "export.py": "66c6e63ecf117046271a6c72ac0dfab6f7c385ec697f40810287fa9d5d0aa22b",
+    "__init__.py": "1ce818ca82e9e12583f82c17815970f3263632eb7b1fbf2c2332bf9a2dc1dc53",
+    "evaluation.py": "eff45a1f8461c8360f4728243f2bb0b423e4f27cf58808959eff9f43278b56cd",
+    "schema.py": "c455d210453ded546868f7406ddddcbf3d0172d5d4a2a4fb2d8076921de73a8f",
+    "roles.py": "7a333cf8de18c81ade51ebead3d1122052d5274456b5159e605d8d044aac0c8c",
+    "verification.py": "e7c2fd20885b9ce7273535da919ab51f88d3e0634052432186ca109f14665c31",
+    "selection.py": "1a52e431eb99197fd418a040ff5d6d5d00e0ac4f989a1b3ed502082fb0cbf40c",
+    "quality_store.py": "0f0855ec80b8f2827c78bf51efe52bb6317420cbcdf4740f08de35636e48a819",
+    "workflow.py": "1d8c544df6d732d37cfb676a86abb0f17411fe3dd8cd1cecaa564aa3dfc5fac5"
+  },
+  "fixed_pool_selection": {
+    "lexical": {
+      "cases": [
+        {
+          "case_id": "benchmark-reporting",
+          "k": 5,
+          "selected": [
+            "arxiv:2303.18190",
+            "arxiv:2211.09110",
+            "arxiv:1810.03993",
+            "arxiv:1803.09010"
+          ],
+          "candidate_count": 9,
+          "recall_at_k": 0.5714285714285714,
+          "precision_at_k": 1.0,
+          "counter_recall_at_k": 0.0
+        }
+      ],
+      "notice": "Limited developer annotations, not independent relevance truth or discovery completeness."
+    },
+    "selected": {
+      "cases": [
+        {
+          "case_id": "benchmark-reporting",
+          "k": 5,
+          "selected": [
+            "arxiv:2211.09110",
+            "arxiv:1802.07810",
+            "arxiv:1810.03993",
+            "arxiv:2102.09692",
+            "arxiv:2303.18190"
+          ],
+          "candidate_count": 9,
+          "recall_at_k": 0.7142857142857143,
+          "precision_at_k": 1.0,
+          "counter_recall_at_k": 1.0
+        }
+      ],
+      "notice": "Limited developer annotations, not independent relevance truth or discovery completeness."
+    },
+    "lexical_elapsed_seconds": 0.23932101001264527,
+    "model_elapsed_seconds": 22.360800897993613,
+    "reported_usage": {
+      "input_tokens": 12599,
+      "cached_input_tokens": 0,
+      "cache_write_input_tokens": 0,
+      "output_tokens": 632,
+      "reasoning_output_tokens": 0
+    }
+  }
+}

@@ -1,0 +1,88 @@
+{
+  "version": 1,
+  "notice": "Real publications, assistant-curated limited labels and paraphrased abstract summaries, not verbatim abstracts or independent expert relevance truth. Full-text support is not established. Labels and source URLs are not supplied as ranking answers. This fixed-pool selection diagnostic is separate from open discovery, whose reference set is withheld.",
+  "cases": [
+    {
+      "id": "benchmark-reporting",
+      "question": "Should language-model benchmark reports disclose tested conditions where use should be avoided, alongside aggregate scores? A limited normative reporting proposal, not a claim of measured user benefit or a novel evaluation method.",
+      "terms": [
+        "language model",
+        "benchmark reporting",
+        "deployment risk",
+        "documentation"
+      ],
+      "candidates": [
+        {
+          "id": "arxiv:2211.09110",
+          "title": "Holistic Evaluation of Language Models",
+          "abstract": "Assistant paraphrase of the primary abstract; not a quotation: Organizes language-model evaluation by use scenarios and multiple metrics, notes missing coverage, and conducts standardized model comparisons. Reports tradeoffs and releases evaluation artifacts.",
+          "label": "core",
+          "url": "https://arxiv.org/abs/2211.09110",
+          "screening_scope": "Primary abstract and metadata inspected; full-text support must be checked separately."
+        },
+        {
+          "id": "arxiv:1810.03993",
+          "title": "Model Cards for Model Reporting",
+          "abstract": "Assistant paraphrase of the primary abstract; not a quotation: Proposes short model documentation describing intended context, performance under relevant conditions, and evaluation procedures. Gives examples for an image classifier and a text classifier.",
+          "label": "core",
+          "url": "https://arxiv.org/abs/1810.03993",
+          "screening_scope": "Primary abstract and metadata inspected; full-text support must be checked separately."
+        },
+        {
+          "id": "arxiv:2303.18190",
+          "title": "Assessing Language Model Deployment with Risk Cards",
+          "abstract": "Assistant paraphrase of the primary abstract; not a quotation: Proposes structured assessment and documentation of risks associated with specific language-model applications. Includes routes from risks to harms, scenario conditions and example prompt-output pairs.",
+          "label": "core",
+          "url": "https://arxiv.org/abs/2303.18190",
+          "screening_scope": "Primary abstract and metadata inspected; full-text support must be checked separately."
+        },
+        {
+          "id": "arxiv:2411.12990",
+          "title": "BetterBench: Assessing AI Benchmarks, Uncovering Issues, and Establishing Best Practices",
+          "abstract": "Assistant paraphrase of the primary abstract; not a quotation: Assesses practices across the AI benchmark lifecycle, examining design, usability, reporting and replication. Provides a checklist and benchmark assessments.",
+          "label": "core",
+          "url": "https://arxiv.org/abs/2411.12990",
+          "screening_scope": "Primary abstract and metadata inspected; full-text support must be checked separately."
+        },
+        {
+          "id": "arxiv:1803.09010",
+          "title": "Datasheets for Datasets",
+          "abstract": "Assistant paraphrase of the primary abstract; not a quotation: Proposes accompanying datasets with documentation covering motivation, composition, collection and recommended uses, to improve communication between dataset creators and users.",
+          "label": "core",
+          "url": "https://arxiv.org/abs/1803.09010",
+          "screening_scope": "Primary abstract and metadata inspected; full-text support must be checked separately."
+        },
+        {
+          "id": "arxiv:1802.07810",
+          "title": "Manipulating and Measuring Model Interpretability",
+          "abstract": "Assistant paraphrase of the primary abstract; not a quotation: Presents controlled experiments varying model transparency and number of features. Participants could better simulate some models without consistently following their predictions more; clearer models could make sizable mistakes harder to detect.",
+          "label": "counter",
+          "url": "https://arxiv.org/abs/1802.07810",
+          "screening_scope": "Primary abstract and metadata inspected; full-text support must be checked separately."
+        },
+        {
+          "id": "arxiv:2102.09692",
+          "title": "To Trust or to Think: Cognitive Forcing Functions Can Reduce Overreliance on AI in AI-assisted Decision-making",
+          "abstract": "Assistant paraphrase of the primary abstract; not a quotation: Compares cognitive-forcing designs, explainable-AI approaches and a no-AI baseline in a decision task. Reports reduced overreliance for some interventions alongside subjective-rating tradeoffs and differences related to cognitive motivation.",
+          "label": "counter",
+          "url": "https://arxiv.org/abs/2102.09692",
+          "screening_scope": "Primary abstract and metadata inspected; full-text support must be checked separately."
+        },
+        {
+          "id": "arxiv:1706.03762",
+          "title": "Attention Is All You Need",
+          "abstract": "Assistant paraphrase of the primary abstract; not a quotation: Introduces the Transformer architecture based on attention and reports experiments in machine translation and parsing.",
+          "label": "context",
+          "url": "https://arxiv.org/abs/1706.03762"
+        },
+        {
+          "id": "arxiv:2102.09672",
+          "title": "Improved Denoising Diffusion Probabilistic Models",
+          "abstract": "Assistant paraphrase of the primary abstract; not a quotation: Modifies denoising diffusion probabilistic models and evaluates sample quality, likelihood, sampling efficiency and generative-model distribution coverage.",
+          "label": "unrelated",
+          "url": "https://arxiv.org/abs/2102.09672"
+        }
+      ]
+    }
+  ]
+}

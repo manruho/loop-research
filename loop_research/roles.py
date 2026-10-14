@@ -352,13 +352,13 @@ def validate_semantics(kind, data, result):
 from .selection import PROMPT as SELECTION_PROMPT
 PROMPTS['selection'] = SELECTION_PROMPT
 PROMPT_VERSIONS = {kind: 2 for kind in PROMPTS}
-PROMPT_VERSIONS['selection'] = 1
+PROMPT_VERSIONS['selection'] = 2
 PROMPT_VERSIONS["redesign"] = 3
 PROMPT_VERSIONS["draft"] = 4
 
 from .verification import PROMPT as VERIFY_PROMPT
 PROMPTS["verify"] = VERIFY_PROMPT
-PROMPT_VERSIONS["verify"] = 11
+PROMPT_VERSIONS["verify"] = 12
 
 PROMPTS["revise_draft"] = (
     "Revise the supplied English manuscript to address the supplied citation/fact verification issues. "

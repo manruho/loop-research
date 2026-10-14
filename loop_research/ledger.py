@@ -5,7 +5,7 @@ import re
 from .common import ResearchError, label
 from .schema import obj, array, string
 
-CHECK = obj(path=string(minimum=1, maximum=300), operator=string(('equals', 'contains', 'all_equal')),
+CHECK = obj(path=string(minimum=1, maximum=300), operator=string(('equals', 'not_equals', 'contains', 'all_equal')),
             expected_json=string(minimum=1, maximum=2000))
 CLAIM = obj(id=string(minimum=1, maximum=30), block_id=string(minimum=1, maximum=30),
             field=string(('text', 'qualification')), text=string(minimum=1, maximum=1800),
@@ -110,6 +110,13 @@ def normalize(data, claims, manuscript):
                 op = check['operator']
                 if op == 'equals':
                     matches = canonical(observed) == canonical(expected)
+                elif op == 'not_equals' and type(observed) in (str, int, float, bool) and type(observed) is type(expected):
+                    comparison = re.search(r'\b(?:differs?|different|unequal|not equal|does not match|do not match|not the same)\b|一致しない|異なる', item['text'], re.IGNORECASE)
+                    if not comparison:
+                        check.update(verdict='undetermined', observed=observed, reason='Negative comparison is not explicit in the extracted span; semantic mapping requires review')
+                        checks.append(check)
+                        continue
+                    matches = observed != expected
                 elif op == 'contains' and isinstance(observed, list):
                     matches = any(canonical(v) == canonical(expected) for v in observed)
                 elif op == 'contains' and isinstance(observed, dict) and isinstance(expected, str):
