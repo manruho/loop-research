@@ -356,3 +356,26 @@ python3 -m loop_research run abandon R001 --reason "関連プロセスを停止�
 分類の回帰評価は `research eval extraction --model gpt-6-astra --output .research/extraction-eval`
 で実行できます。開発者が作成した短い評価例への一致を測るもので、
 人間による独立評価や論文全体の抽出精度の証明ではありません。
+
+### LaTeXとPDFで出力
+
+```bash
+research --db .research/study.sqlite3 study export --output .research/paper-export
+research --db .research/study.sqlite3 study export --output .research/paper-pdf --pdf
+```
+
+通常のエクスポートにも `paper.tex`、`references.bib`、`latex-trace.json` が含まれます。
+`--pdf`を付けるとLuaLaTeX・BibTeXで `paper.pdf` も生成します。
+必要なものはLuaLaTeX、BibTeX、luatexja、natbib、geometry、hyperrefです。
+日本語を含む留保も扱える汎用article形式で、投稿先のテンプレートへ変更できます。
+手動コンパイル手順は生成された `LATEX.md` にあります。
+
+本文は安全な文字列としてエスケープし、引用キーは保存済みの文献・根拠から生成します。
+本文のraw LaTeXコマンド・数式としての解釈には対応していません。
+各段落の主張・根拠IDとTeX行の対応を `latex-trace.json` に残します。
+PDF生成はshell escapeを無効にした一時作業ディレクトリで行い、
+文字欠落や最終パスの未解決引用がある場合は失敗として扱います。
+
+LaTeXの直接編集は研究DBへ反映されず、検証済み扱いにもなりません。
+研究上の修正は構造化草稿へ戻して再検証・再査読し、再エクスポートしてください。
+既存の出力先は上書きしません。Markdownと追跡用JSONも引き続き出力します。

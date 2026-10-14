@@ -17,8 +17,8 @@ def json_text(value):
 
 
 def bib_escape(value):
-    replacements = {"\\": "\\textbackslash{}", "{": "\\{", "}": "\\}", "\n": " "}
-    return "".join(replacements.get(char, char) for char in str(value))
+    from .latex import escape
+    return escape(value)
 
 
 def bibliography(store):
@@ -124,7 +124,7 @@ def uncertainties(store, workflow):
     return "\n".join(lines) + "\n"
 
 
-def export_study(store, output, include_sources=False):
+def export_study(store, output, include_sources=False, pdf=False):
     target = Path(output).expanduser().resolve()
     if target.exists():
         raise ResearchError("出力先はすでに存在します。新しいディレクトリを指定してください。")
@@ -166,6 +166,12 @@ def export_study(store, output, include_sources=False):
             "draft.md": render_draft(store, draft, state["status"], current is not None),
             "uncertainties.md": uncertainties(store, workflow), "references.bib": bibliography(store),
         }
+        from .latex import render, manual_bibliography
+        tex, trace, manual = render(store, draft, state["status"], current is not None)
+        files["paper.tex"] = tex
+        files["latex-trace.json"] = json_text(trace)
+        files["references.bib"] += manual_bibliography(manual)
+        files["LATEX.md"] = "# LaTeX manuscript\n\nCompile with: lualatex -no-shell-escape paper.tex; bibtex paper; lualatex -no-shell-escape paper.tex; lualatex -no-shell-escape paper.tex\n\nRequires LuaLaTeX, luatexja, natbib, hyperref and BibTeX. Article template; no author identity is invented. Editing TeX does not update or revalidate the research ledger. See latex-trace.json for block, claim and evidence mappings.\n"
         if draft:
             editable = json.loads(json.dumps(draft["content"]))
             for block in blocks(editable):
@@ -205,8 +211,14 @@ def export_study(store, output, include_sources=False):
             path.parent.mkdir(parents=True, exist_ok=True)
             path.write_bytes(payload)
             hashes[name] = hashlib.sha256(payload).hexdigest()
+        pdf_build = None
+        if pdf:
+            from .latex import compile_pdf
+            pdf_build = compile_pdf(stage)
+            for name in ("paper.pdf", "latex-build.log"):
+                hashes[name] = hashlib.sha256((stage / name).read_bytes()).hexdigest()
         manifest = {
-            "format_version": 1, "exported_at": now(), "research_fingerprint": snapshot,
+            "format_version": 2, "pdf_build": pdf_build, "exported_at": now(), "research_fingerprint": snapshot,
             "status": state["status"], "current_draft": current["id"] if current else None,
             "historical_draft": draft["id"] if draft and not current else None,
             "sources_included": include_sources, "files": hashes,
@@ -217,4 +229,5 @@ def export_study(store, output, include_sources=False):
             raise ResearchError("出力先が作成されたため上書きせず停止しました。")
         os.rename(stage, target)
     return {"output": str(target), "manifest": str(target / "manifest.json"),
-            "status": state["status"], "current_draft": manifest["current_draft"]}
+            "status": state["status"], "current_draft": manifest["current_draft"],
+            "latex": str(target / "paper.tex"), "pdf": str(target / "paper.pdf") if pdf else None}

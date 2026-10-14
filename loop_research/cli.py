@@ -114,6 +114,7 @@ def parser():
     export = actions.add_parser("export")
     export.add_argument("--output", required=True)
     export.add_argument("--include-sources", action="store_true")
+    export.add_argument("--pdf", action="store_true", help="LuaLaTeXとBibTeXでpaper.pdfも生成")
     imported = actions.add_parser("import-draft", help="人間が編集した構造化草稿を新しい版として取り込む")
     imported.add_argument("--file", required=True)
     imported.add_argument("--reason", required=True)
@@ -293,7 +294,7 @@ def dispatch(store, args):
             store.db.commit()
             return store.study_state()
         if args.action == "export":
-            return export_study(store, args.output, args.include_sources)
+            return export_study(store, args.output, args.include_sources, pdf=args.pdf)
         configure_options(store, args)
         workflow = ResearchWorkflow(store)
         if args.action == "status":

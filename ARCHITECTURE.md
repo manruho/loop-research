@@ -59,3 +59,18 @@ major/critical issue in consecutive reviews of distinct drafts, under the same
 basis and contract. After two unsuccessful revisions it chooses `consult` and
 records a `study.handoff` event. The status remains `needs_human`; human issue
 responses or substantive research changes are required to make progress.
+
+### LaTeX export
+
+`latex.py` renders the immutable structured manuscript into an escaped article
+with BibTeX citations, qualifications and uncertainty disclosures. No model
+rewriting occurs during rendering. `latex-trace.json` associates TeX line spans
+with source blocks, claims, evidence and bibliography keys. Manual-attribution
+citations receive E-key BibTeX entries without fabricated authors/dates.
+
+Every export includes TeX; optional `--pdf` invokes LuaLaTeX/BibTeX inside a
+separate temporary build directory with shell escape disabled. The resulting
+PDF and build log join the same atomically published export and manifest hash
+inventory. Export format 2 adds PDF build metadata; existing JSON evidence and
+research-state semantics are preserved. Editing rendered TeX does not update
+or validate the authoritative research ledger.
