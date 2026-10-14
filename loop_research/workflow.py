@@ -295,6 +295,17 @@ class ResearchWorkflow:
             if not outline:
                 raise ResearchError("現行状態に対応する論証を先に作成してください。")
             common["outline"] = {"id": outline["id"], "content": outline["content"]}
+            from . import ledger
+            common["ledger_snapshot"] = ledger.snapshot(self.store, self.scope(), context)
+            if kind == "draft":
+                for task in reversed(self.store.list_tasks()):
+                    if task["kind"] != "draft" or task["status"] != "failed":
+                        continue
+                    previous = self.store.show_task(task["id"])
+                    prior = previous["input"]["data"]
+                    if prior.get("basis") == common["basis"] and prior.get("outline", {}).get("id") == outline["id"]:
+                        common["validation_feedback"] = {"task_id": task["id"], "error": previous["error"]}
+                        break
             if kind == "revise_draft":
                 draft, review = self.current_artifact("draft"), self.latest_relevant_review()
                 if not draft or not review:
@@ -494,6 +505,13 @@ class ResearchWorkflow:
         orientation = self.orientation()
         terms = orientation["content"]["key_terms"] if orientation else []
         words = {word.lower() for term in terms for word in re.findall(r"[A-Za-z]{4,}", term)}
+        # This conservative lexical screen is not a semantic relevance judgment.
+        # Generic evaluation/risk words alone should not consume acquisition slots.
+        stop = {"should", "would", "could", "alongside", "their", "about", "which", "where", "with",
+                "from", "that", "this", "have", "been", "does", "question", "proposal", "claim",
+                "risk", "evaluation", "report", "reporting", "condition", "performance", "disclosure"}
+        question_words = {word.lower().rstrip("s") for word in re.findall(r"[A-Za-z]{4,}", self.store.study_state()["question"])}
+        question_words = (question_words | {word.rstrip("s") for word in words}) - stop
         scores = []
         targeted = set()
         review = self.latest_relevant_review()
@@ -508,6 +526,12 @@ class ResearchWorkflow:
         for item in self.store.list_papers():
             raw = self.store.paper_row(item["id"])
             text = (raw["title"] + " " + raw["abstract"]).lower()
+            metadata = json.loads(raw["metadata_json"])
+            if raw["provider"] != "manual" and isinstance(metadata, dict) and metadata.get("type") == "component":
+                continue
+            tokens = {word.rstrip("s") for word in re.findall(r"[a-z]{4,}", text)}
+            if raw["provider"] != "manual" and len(question_words & tokens) < min(2, len(question_words)):
+                continue
             score = sum(min(text.count(word), 5) for word in words)
             if raw["provider"] == "manual":
                 score += 5
@@ -654,7 +678,9 @@ class ResearchWorkflow:
         if not pending:
             attempted = {(row["provider"], row["query"]) for row in self.store.list_searches()}
             graph_new = self.store.db.execute("SELECT COUNT(DISTINCT paper_id) FROM search_results WHERE search_id IN (SELECT id FROM searches WHERE query LIKE 'graph:%') AND paper_id NOT IN (SELECT paper_id FROM search_results WHERE search_id IN (SELECT id FROM searches WHERE query NOT LIKE 'graph:%'))").fetchone()[0]
-            seeds = [p for p in self.store.list_papers() if any(not d["query"].startswith("graph:") for d in self.store.show_paper(p["id"])["discoveries"])]
+            seeds = [p for p in self.ranked_papers() if p["provider"] == "manual" or any(
+                not d["query"].startswith("graph:") for d in self.store.show_paper(p["id"])["discoveries"])]
+            seeds.sort(key=lambda p: p["provider"] != "manual")
             for seed in seeds[:settings["citation_seeds"]]:
                 for direction in ("references", "citations"):
                     signature = ("openalex", "graph:" + seed["id"] + ":" + direction)
@@ -968,6 +994,8 @@ class ResearchWorkflow:
         try:
             self.store.db.execute("BEGIN IMMEDIATE")
             data = self.data_for("outline")
+            from . import ledger
+            data["ledger_snapshot"] = ledger.snapshot(self.store, self.scope(), data["context"])
             roles.validate_semantics("draft", data, content)
             self.store.apply_draft(None, "human:" + digest(content), data, content)
             artifact = self.store.latest_artifact("draft")

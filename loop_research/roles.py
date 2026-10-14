@@ -53,7 +53,7 @@ OUTLINE = obj(
 )
 BLOCK = obj(
     text=string(minimum=1, maximum=8000),
-    kind=string(("fact", "interpretation", "position", "hypothesis")),
+    kind=string(("fact", "ledger_fact", "interpretation", "position", "hypothesis")),
     evidence_ids=IDS, claim_ids=IDS, qualification=string(maximum=2000),
 )
 DRAFT = obj(
@@ -138,7 +138,11 @@ PROMPTS = {
         "Write a complete editable ENGLISH position-paper draft from the outline and evidence ledger. "
         "Aim for a concise 1200-2000 word working draft; do not pad it to meet a count. "
         "Use abstract_blocks and sections for introduction, related work, position/argument, counterarguments, "
-        "implications, limitations and conclusion. Each paragraph is a block. Every fact requires evidence_ids. "
+        "implications, limitations and conclusion. Each paragraph is a block. Literature fact blocks require evidence_ids. "
+        "Use ledger_fact for factual self-reports about supplied research records, with empty evidence_ids; "
+        "these will be checked against ledger_snapshot, not papers. Keep ledger and literature facts in separate blocks. "
+        "Describe only recorded scope, never infer unrecorded activity did not occur. "
+        "If validation_feedback is supplied, correct the failed draft contract. "
         "Map each major block to the selected C ID via claim_ids. Do not invent references, experiments, "
         "numbers, quotations, study findings or citation markers: the host adds citations. A block may "
         "express a normative position or hypothesis without empirical evidence if labeled accordingly. "
@@ -266,6 +270,9 @@ def validate_semantics(kind, data, result):
                 )
                 if limited and not block["qualification"].strip():
                     raise ResearchError("限定的・未確認の根拠に基づく事実に留保がありません。")
+            if block["kind"] == "ledger_fact":
+                if not data.get("ledger_snapshot") or block["evidence_ids"]:
+                    raise ResearchError("台帳の事実には研究記録スナップショットが必要です。文献引用と段落を分けてください。")
     elif kind == "review":
         from .verification import blocking
         if result["decision"] == "ready_for_human" and blocking(data["verification"]["content"]):
@@ -317,10 +324,11 @@ def validate_semantics(kind, data, result):
 
 PROMPT_VERSIONS = {kind: 2 for kind in PROMPTS}
 PROMPT_VERSIONS["redesign"] = 3
+PROMPT_VERSIONS["draft"] = 3
 
 from .verification import PROMPT as VERIFY_PROMPT
 PROMPTS["verify"] = VERIFY_PROMPT
-PROMPT_VERSIONS["verify"] = 9
+PROMPT_VERSIONS["verify"] = 10
 
 PROMPTS["revise_draft"] = (
     "Revise the supplied English manuscript to address the supplied citation/fact verification issues. "
@@ -335,7 +343,8 @@ PROMPTS["revise_draft"] = (
     "supplied E IDs; the host adds citations. Do not claim that the fix is verified: it will be verified "
     "and reviewed again, including prior unresolved issues."
 )
-PROMPT_VERSIONS["revise_draft"] = 3
+PROMPT_VERSIONS["revise_draft"] = 4
+PROMPTS["revise_draft"] += " Use ledger_fact with empty evidence_ids for factual research-record statements; keep scientific facts separately cited. Do not infer absence of unrecorded activity."
 
 PROMPT_VERSIONS["review"] = 5
 

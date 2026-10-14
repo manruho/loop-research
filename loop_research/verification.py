@@ -24,6 +24,8 @@ PROMPT = (
     "identified conjectures, normative/value premises, stipulated definitions and analytic/logical "
     "arguments that are not empirical assertions; the reviewer evaluates their reasoning separately. "
     "Extract factual self-reports about search/reading/evidence status into ledger_claims, not literature facts. "
+    "Every ledger_fact block requires extracted ledger assertions with exact text spans and record paths; "
+    "a ledger_fact label is not evidence. Extract scientific assertions misclassified there as literature facts too. "
     "CLASSIFICATION BOUNDARY: uncertainty statements such as 'novelty remains unresolved', 'effectiveness "
     "is not established', 'this proposal has not demonstrated benefits' or 'these passages cannot establish "
     "an independent effect' describe epistemic limits, not recorded actions. Do not invent ledger fields "
@@ -92,6 +94,10 @@ def normalize(data, result):
         found = any(f["block_id"] == item["block_id"] for f in result["ledger_claims"])
         if item["status"] == "no_facts" and found:
             raise ResearchError("実行記録の範囲判定と抽出結果が矛盾しています。")
+        if manuscript[item["block_id"]]["kind"] == "ledger_fact" and not found:
+            item["model_status"] = item["status"]
+            item["status"] = "incomplete"
+            item["reason"] = "Host coverage gate: ledger_fact block has no extracted ledger assertions. " + item["reason"]
     result["ledger_snapshot_sha256"] = data["ledger_snapshot"]["sha256"]
     ids = set()
     for fact in result["facts"]:

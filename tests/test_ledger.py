@@ -73,6 +73,42 @@ class LedgerAcceptance(unittest.TestCase):
         self.assertEqual(block['text'][fact['start']:fact['end']], fact['text'])
         self.assertFalse(verification.blocking(result))
 
+    def test_ledger_fact_is_traceable_without_a_literature_citation(self):
+        workflow, data, raw = self.case()
+        block = roles.blocks(data['draft']['content'])[0]
+        block.update(kind='ledger_fact', evidence_ids=[])
+        result = verification.normalize(data, raw)
+        self.assertEqual(result['ledger_claims'][0]['verdict'], 'supported')
+        self.assertFalse(verification.blocking(result))
+        draft_data = workflow.data_for('draft')
+        draft = copy.deepcopy(workflow.current_artifact('draft')['content'])
+        target = roles.blocks(draft)[0]
+        target.update(kind='ledger_fact', evidence_ids=[], text='The ledger records one search.')
+        roles.validate_semantics('draft', draft_data, draft)
+        for bad in ('missing_snapshot', 'literature_citation', 'uncited_literature_fact'):
+            d, r = copy.deepcopy(draft_data), copy.deepcopy(draft)
+            b = roles.blocks(r)[0]
+            if bad == 'missing_snapshot': d.pop('ledger_snapshot')
+            elif bad == 'literature_citation': b['evidence_ids'] = list(d['context']['evidence'])[:1]
+            else: b['kind'] = 'fact'
+            with self.subTest(bad=bad), self.assertRaises(ResearchError):
+                roles.validate_semantics('draft', d, r)
+        path = self.root / 'ledger-draft.json'
+        path.write_text(json.dumps(draft))
+        imported = workflow.import_draft(path, 'Explicit record-based statement')
+        self.assertEqual(roles.blocks(imported['content'])[0]['kind'], 'ledger_fact')
+        self.assertIsNone(workflow.current_verification())
+
+    def test_ledger_fact_cannot_skip_extraction(self):
+        _, data, raw = self.case()
+        roles.blocks(data['draft']['content'])[0]['kind'] = 'ledger_fact'
+        raw['ledger_claims'] = []
+        for item in raw['ledger_coverage']:
+            item.update(status='no_facts')
+        result = verification.normalize(data, raw)
+        self.assertTrue(verification.blocking(result))
+        self.assertEqual(result['ledger_coverage'][0]['status'], 'incomplete')
+
     def test_wrong_unknown_and_type_mismatched_records_block_completion(self):
         _, data, raw = self.case()
         for path, expected, verdict in [('/search_count', '2', 'contradicted'), ('/search_count', 'true', 'contradicted'), ('/not_recorded', '1', 'undetermined')]:

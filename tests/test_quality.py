@@ -10,7 +10,7 @@ from unittest.mock import patch
 from loop_research.common import ResearchError
 from loop_research.store import ResearchStore
 from loop_research.workflow import ResearchWorkflow
-from loop_research.discovery import parse_work, search_openalex, related_papers
+from loop_research.discovery import parse_work, search_openalex, related_papers, resolve, arxiv_identity
 from loop_research import roles, verification
 from loop_research.evaluation import anonymize, import_scores, save
 from tests.fixtures import FixtureEngine, fake_search, fake_fetch
@@ -159,6 +159,80 @@ class QualityAcceptance(unittest.TestCase):
         self.assertEqual(self.store.show_search("S001")["status"], "failed")
         self.assertEqual(self.store.citation_graph(), [])
 
+    def test_arxiv_resolution_requires_exact_repository_identity(self):
+        from loop_research.literature import register_paper
+        register_paper(self.store, title='Synthetic seed', arxiv='2211.09110')
+        candidate = work('W1')
+        candidate['locations'] = [{'landing_page_url': 'https://arxiv.org/abs/2211.09110v2'}]
+        with patch('loop_research.discovery.request', return_value={'results': [candidate]}) as request:
+            self.assertEqual(resolve(self.store, 'P001')['id'], candidate['id'])
+            self.assertIn('search=', request.call_args[0][0])
+        for candidates in ([work('W1')], [candidate, dict(candidate, id='https://openalex.org/W2')]):
+            with patch('loop_research.discovery.request', return_value={'results': candidates}):
+                with self.assertRaises(ResearchError): resolve(self.store, 'P001')
+        self.assertEqual(arxiv_identity('https://arxiv.org/pdf/2211.09110v2.pdf'), '2211.09110')
+        self.assertIsNone(arxiv_identity('https://arxiv.org.evil.invalid/abs/2211.09110'))
+
+    def test_doi_resolution_uses_canonical_lookup_and_rejects_wrong_identity(self):
+        self.store.add_paper(parse_work(work('W1', doi='10.1234/a')))
+        self.store.db.execute('DELETE FROM paper_aliases')
+        self.store.db.execute("UPDATE papers SET provider='crossref' WHERE id=1")
+        self.store.db.commit()
+        with patch('loop_research.discovery.request', return_value=work('W1', doi='10.1234/a')) as request:
+            resolve(self.store, 'P001')
+            self.assertTrue(request.call_args[0][0].endswith('/doi:10.1234/a'))
+        with patch('loop_research.discovery.request', return_value=work('W2', doi='10.1234/b')):
+            with self.assertRaises(ResearchError): resolve(self.store, 'P001')
+
+    def test_generic_risk_results_do_not_consume_acquisition_slots(self):
+        self.store.configure_study('Domain', question='Language model benchmark reporting')
+        good = work('W1'); good['title'] = 'Language Model Risk Cards'
+        bad = work('W2'); bad['title'] = 'Risk Model for Hail Damages: Evaluation and Warnings'
+        self.store.add_paper(parse_work(good)); self.store.add_paper(parse_work(bad))
+        workflow = ResearchWorkflow(self.store, FixtureEngine())
+        orientation = {'content': {'key_terms': ['risk', 'evaluation', 'language model'], 'search_queries': []}}
+        with patch.object(workflow, 'orientation', return_value=orientation):
+            self.assertEqual([p['id'] for p in workflow.ranked_papers()], ['P001'])
+        self.assertEqual(len(self.store.list_papers()), 2)
+
+    def test_supplementary_components_are_retained_but_not_auto_acquired(self):
+        self.store.configure_study('Domain', question='Language model benchmark reporting')
+        component = work('W1'); component.update(title='Language model benchmark supplement', type='component')
+        self.store.add_paper(parse_work(component))
+        workflow = ResearchWorkflow(self.store, FixtureEngine())
+        orientation = {'content': {'key_terms': ['language model'], 'search_queries': []}}
+        with patch.object(workflow, 'orientation', return_value=orientation):
+            self.assertEqual(workflow.ranked_papers(), [])
+            self.store.db.execute("UPDATE papers SET provider='manual' WHERE id=1")
+            self.store.db.commit()
+            self.assertEqual([p['id'] for p in workflow.ranked_papers()], ['P001'])
+
+    def test_manual_seed_without_search_discovery_is_traversed(self):
+        from loop_research.literature import register_paper
+        register_paper(self.store, title='Explicitly chosen source', arxiv='2211.09110')
+        self.store.configure_study('Graph', settings={'citation_seeds': 1})
+        workflow = ResearchWorkflow(self.store, FixtureEngine())
+        orientation = {'content': {'key_terms': [], 'search_queries': []}}
+        with patch.object(workflow, 'orientation', return_value=orientation):
+            choices = workflow.choices()
+        self.assertTrue(any(c['kind'] == 'related' and c['parameters']['paper'] == 'P001' for c in choices))
+
+    def test_failed_initial_draft_receives_scoped_feedback(self):
+        workflow = self.full()
+        original = workflow.engine.execute
+        def invalid(kind, data, prompt, schema, on_spawn=None):
+            result, execution = original(kind, data, prompt, schema, on_spawn)
+            roles.blocks(result)[0].update(kind='fact', evidence_ids=[])
+            return result, execution
+        with patch.object(workflow.engine, 'execute', side_effect=invalid), contextlib.redirect_stderr(io.StringIO()):
+            with self.assertRaises(ResearchError): workflow.perform('draft', force=True)
+        data = workflow.data_for('draft')
+        self.assertEqual(data['validation_feedback']['task_id'], self.store.list_tasks()[-1]['id'])
+        outline = workflow.current_artifact('outline')
+        outline['id'] = 'O999'
+        with patch.object(workflow, 'current_artifact', return_value=outline):
+            self.assertNotIn('validation_feedback', workflow.data_for('draft'))
+
     def test_verification_snapshots_and_exact_page_offsets(self):
         workflow = self.full()
         verified = workflow.current_verification()
@@ -230,6 +304,7 @@ class QualityAcceptance(unittest.TestCase):
     def test_citation_discovery_enters_acquisition_and_draft(self):
         self.store.configure_study("Exercise graph acquisition", settings={"citation_seeds": 1, "citation_limit": 1, "citation_budget": 1, "paper_limit": 1})
         seed = work("W1", refs=["https://openalex.org/W2"])
+        seed["title"] = "Synthetic checking workload seed"
         neighbor = work("W2")
         neighbor["title"] = "Checking workload in AI collaboration"
         def search(store, query, provider, limit):
