@@ -423,6 +423,8 @@ loop-research eval selection --output .research/selection-v1 --model gpt-6.1-sol
 
 ### 実文献の短時間比較
 
+実行済みの比較結果・失敗・修正後の再試行・未評価項目は[実文献パイロットの測定記録](benchmarks/benchmark-reporting-results.md)を参照してください。
+
 `benchmarks/benchmark-reporting-pilot.json` は、前回の研究課題を1件だけ使う事前定義の比較です。HELMだけを共通の開始資料とし、7本の参照集合はモデルへの正解リストとして渡しません。評価コマンドは1〜20課題に対応し、重複した問いを水増しして実行する必要はありません。
 
 ```bash
