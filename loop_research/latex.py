@@ -10,7 +10,8 @@ from .common import ResearchError
 def escape(text):
     substitutions = {'\\': r'\textbackslash{}', '{': r'\{', '}': r'\}', '$': r'\$', '&': r'\&',
                      '%': r'\%', '#': r'\#', '_': r'\_', '~': r'\textasciitilde{}', '^': r'\textasciicircum{}'}
-    return ''.join(substitutions.get(c, c) for c in str(text))
+    normalized = str(text).replace('\r\n', '\n').replace('\r', '\n')
+    return ''.join(substitutions.get(c, c) for c in normalized)
 
 
 def render(store, artifact, status, current):
@@ -59,6 +60,14 @@ def render(store, artifact, status, current):
     if any(t['bib_keys'] for t in trace):
         lines.extend([r'\bibliographystyle{plainnat}', r'\bibliography{references}'])
     lines.append(r'\end{document}')
+    physical_lines, offset = [], 1
+    for entry in lines:
+        physical_lines.append(offset)
+        offset += entry.count('\n') + 1
+    for item in trace:
+        first, last = item['tex_first_line'] - 1, item['tex_last_line'] - 1
+        item['tex_first_line'] = physical_lines[first]
+        item['tex_last_line'] = physical_lines[last] + lines[last].count('\n')
     return '\n'.join(lines) + '\n', {'draft_id': artifact['id'] if artifact else None, 'current': current,
                                     'status': status, 'blocks': trace,
                                     'notice': 'TeX line locations refer to this export only. Edit the structured manuscript and reverify changes; editing TeX does not update the research ledger.'}, manual
