@@ -527,7 +527,7 @@ class ResearchWorkflow:
         data = self.data_for('selection', document=document)
         settings = self.store.study_state()['settings']
         config = self.engine.config if self.injected_engine else settings
-        key = digest({'kind': 'selection', 'data': data, 'prompt': roles.PROMPTS['selection'],
+        key = digest({'kind': 'selection', 'data': data, 'prompt': self.prompt_for('selection'),
                       'schema': SCHEMAS['selection'], 'prompt_version': roles.PROMPT_VERSIONS['selection'],
                       'model': config.get('model'), 'reasoning_effort': config.get('reasoning_effort')})
         return self.store.latest_artifact('selection', key)
@@ -996,8 +996,11 @@ class ResearchWorkflow:
                         selected = self.store.study_state()['selected_claim_id']
                         if selected and self.store.claim_row(selected)['status'] in ('held', 'withdrawn'):
                             selected = None
-                        kind = ('review' if selected and self.current_verification() else
-                                'verify' if selected and self.current_artifact('draft') else 'draft')
+                        draft = self.current_artifact('draft') if selected else None
+                        verified = self.current_verification() if draft else None
+                        reviewed = self.latest_relevant_review() if verified else None
+                        kind = ('verify' if draft and not verified else
+                                'review' if verified and not reviewed else 'draft')
                         plan = budget.allocation(kind, self.run_seconds, self.deadline - time.monotonic(),
                                                  self.store.study_state()['settings']['timeout'])
                         if plan['timeout_seconds'] <= 0:

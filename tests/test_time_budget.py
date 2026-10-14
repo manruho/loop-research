@@ -121,3 +121,31 @@ class TimeBudget(unittest.TestCase):
         self.assertNotIn('verify', engine.calls)
         self.assertNotIn('review', engine.calls)
         self.assertEqual(self.store.list_tasks()[-1]['status'], 'timed_out')
+
+    def test_completed_audit_does_not_allow_a_new_cycle_to_spend_its_reserve(self):
+        w = ResearchWorkflow(self.store, FixtureEngine())
+        with patch('loop_research.workflow.search_papers', fake_search), \
+             patch('loop_research.workflow.fetch_paper', fake_fetch), contextlib.redirect_stderr(io.StringIO()):
+            result = w.run(100)
+        self.assertEqual(result['state']['status'], 'ready_for_human')
+        clock = iter([0.0, 80.0])
+        with patch('loop_research.workflow.time.monotonic', side_effect=lambda: next(clock, 80.0)), \
+             patch.object(w, 'choices', return_value=[]) as choices:
+            result = w.run(10, resume_reason='Another bounded cycle', max_seconds=100)
+        self.assertEqual(result['state']['status'], 'budget_exhausted')
+        choices.assert_not_called()
+        self.assertIsNotNone(result['current_draft'])
+        self.assertIsNotNone(result['current_verification'])
+
+    def test_compact_selection_cache_matches_execution_prompt(self):
+        fake_search(self.store, 'synthetic workload', 'arxiv', 1)
+        engine = FixtureEngine()
+        w = ResearchWorkflow(self.store, engine)
+        w.run_seconds, w.deadline = 600, time.monotonic() + 600
+        with contextlib.redirect_stderr(io.StringIO()):
+            task = w.perform('selection')
+        self.assertIsNotNone(w.cached_selection())
+        self.assertIn('concise English', task['prompt'])
+        with contextlib.redirect_stderr(io.StringIO()):
+            self.assertEqual(w.perform('selection')['id'], task['id'])
+        self.assertEqual(engine.calls.count('selection'), 1)
