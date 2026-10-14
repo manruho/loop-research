@@ -9,6 +9,7 @@ PROMPT = (
     'Select material for the research question by conceptual relevance, not vocabulary overlap. '
     'Judge every supplied candidate once. core addresses the central question; counter provides a '
     'credible rival position, null result, limitation or challenge; context is adjacent background. '
+    'Use review_followup reading purposes and unresolved issue context when supplied, prioritizing the requested gap and counterevidence. '
     'Use uncertain when metadata or selection snippets cannot establish relevance, not unrelated. '
     'Explicitly preserve foundational frameworks with different terminology and strong counterevidence. '
     'A title/abstract/snippet is not proof of substantive support or full-text inspection. '

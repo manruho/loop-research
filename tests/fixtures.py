@@ -112,6 +112,7 @@ class FixtureEngine:
                       "parent_claim_ids": [data["claim_id"]], "evidence_ids": eids, "assumptions": notes,
                       "counterarguments": ["Detectability remains necessary."], "novelty": "限定的な差分は未確認",
                       "open_questions": notes, "requested_searches": [],
+                      "reading_requests": [],
                       "issue_responses": [{"issue_id": issue["id"], "response": "Normative scope has narrowed.",
                                           "remaining_uncertainty": "Must be independently re-reviewed."}
                                          for issue in data["issues"]]}

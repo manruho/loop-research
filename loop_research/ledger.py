@@ -21,7 +21,7 @@ def canonical(value):
     return json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(',', ':'), allow_nan=False)
 
 
-def snapshot(store, scope, context, draft=None):
+def snapshot(store, scope, context, draft=None, discovery_deferred=None):
     searches = scope['searches']
     keyword = [s for s in searches if not s['query'].startswith('graph:')]
     readings = [r for r in scope['readings'] if r['research_question'] == store.study_state()['question']]
@@ -44,9 +44,14 @@ def snapshot(store, scope, context, draft=None):
         'evidence_status': {label(e['id'], 'E'): e['status'] for e in evidence},
         'evidence_relation': {label(e['id'], 'E'): e['relation'] for e in evidence},
         'paper_scope': {pid: p['seen_scope'] for pid, p in context['papers'].items()},
+        'paper_titles': {pid: p['title'] for pid, p in context['papers'].items()},
+        'citation_graph': scope['citation_graph'],
         'documents': documents,
         'paper_read_pages': {pid: sorted(pages) for pid, pages in paper_pages.items()},
     }
+    deferred = draft['input'].get('discovery_deferred') if draft else discovery_deferred
+    if type(deferred) is bool:
+        records['discovery_deferred'] = deferred
     if draft and draft.get('task_id'):
         writer = store.show_task(draft['task_id'])
         writer_scope = writer['input']['data'].get('context', {}).get('scope', {})
@@ -133,6 +138,10 @@ def normalize(data, claims, manuscript):
                 configuration_claim = re.search(r'configur|disabled|enabled|permitted|allowed|設定|無効|有効', item['text'], re.IGNORECASE)
                 if action_claim or not configuration_claim:
                     check.update(verdict='undetermined', reason='Web-search configuration cannot establish actual tool use, search execution or exclusive source use')
+            if check['path'].removeprefix('/records').startswith('/evidence_status') and check['verdict'] == 'supported':
+                absence = re.search(r'not\s+human[- ]verified|(?:no|never|without)\b.{0,50}\b(?:human|manual)\b|人間による確認.{0,12}(?:ない|無し)|人間.{0,12}未確認', item['text'], re.IGNORECASE)
+                if absence:
+                    check.update(verdict='undetermined', reason='Evidence status cannot establish absence of human verification activity')
             checks.append(check)
         verdicts = {c['verdict'] for c in checks}
         item['extraction_reason'] = item['reason']

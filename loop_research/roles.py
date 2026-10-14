@@ -84,6 +84,7 @@ REDESIGN = obj(
     text=string(), kind=string(CLAIM_KINDS), scope=TEXT, reason=TEXT,
     parent_claim_ids=IDS, evidence_ids=IDS, assumptions=NOTES, counterarguments=NOTES,
     novelty=TEXT, open_questions=NOTES, requested_searches=array(QUERY, maximum=5),
+    reading_requests=array(obj(paper_id=string(minimum=1, maximum=30), issue_ids=IDS, purpose=TEXT), maximum=5),
     issue_responses=array(obj(issue_id=string(minimum=1, maximum=30), response=TEXT,
                               remaining_uncertainty=TEXT), maximum=150),
 )
@@ -105,6 +106,8 @@ PROMPTS = {
         "spans in quotations. Use short contiguous excerpts; if extraction seems broken, disclose "
         "the problem and return fewer or no findings instead of reconstructing a quotation. "
         "Do not claim to have read other pages or the whole paper. Unrelated material may have no findings."
+        " If review_followup is supplied, read for the specified issue/purpose, including contrary evidence. "
+        "Record what the passage changes and what it cannot settle; a reading never resolves an issue by itself."
     ),
     "exploration": (
         "Explore 2-4 meaningfully competing positions, with scope, audience, assumptions, the strongest "
@@ -150,7 +153,9 @@ PROMPTS = {
         "express a normative position or hypothesis without empirical evidence if labeled accordingly. "
         "For facts based on abstracts, search results, unchecked excerpts or unverified source attribution, "
         "qualification must explicitly disclose that limit IN ENGLISH. Keep claim scope modest and "
-        "the strongest counterargument visible. The evidence is provisional, not human-verified."
+        "the strongest counterargument visible. The evidence is provisional. Describe checked/unchecked as recorded statuses; "
+        "unchecked does not prove a human has never reviewed the source. If revision_plan is supplied, "
+        "address its issue responses and newly read evidence, preserving unresolved criticism."
     ),
     "review": (
         "Act as a critical reviewer in a fresh context. You receive the manuscript, source excerpts, "
@@ -173,6 +178,10 @@ PROMPTS = {
         "revise its scope and premises; fork/merge if another position is needed; withdraw if the contribution "
         "collapses; hold if it needs human judgment. Record responses and remaining uncertainty for "
         "all supplied blocking issues. Use only given evidence IDs, never disputed/inaccessible evidence. "
+        "For missing content in a known paper, prefer reading_requests over rediscovering its title: provide supplied P IDs, "
+        "the relevant allowed issue_ids and a specific reading purpose. Use these only with decision=research. "
+        "Request new searches only for a concrete gap not addressed by known papers. A historical review remains criticism, "
+        "not current approval; evaluate new evidence and consider limiting or withdrawing the thesis. "
         "issue_responses may contain only IDs in issues (also listed in allowed_issue_ids), once each. "
         "Include persistent historical issues supplied there. Resolved or not-applicable assessments "
         "in review are historical context, not response targets. If validation_feedback is present, "
@@ -341,7 +350,16 @@ def validate_semantics(kind, data, result):
                 raise ResearchError("主張の再設計が実際の変更になっていません。")
         if result["decision"] == "merge" and len(result["parent_claim_ids"]) < 2:
             raise ResearchError("統合には複数の主張が必要です。")
-        if result["decision"] == "research" and not result["requested_searches"]:
+        for request in result['reading_requests']:
+            check_ids([request['paper_id']], papers, '追加読解の論文')
+            check_ids(request['issue_ids'], [issue['id'] for issue in data['issues']], '追加読解の指摘')
+            if not request['issue_ids']:
+                raise ResearchError('追加読解を少なくとも一つの指摘へ結び付けてください。')
+        if len({r['paper_id'] for r in result['reading_requests']}) != len(result['reading_requests']):
+            raise ResearchError('追加読解の論文IDが重複しています。')
+        if result['reading_requests'] and result['decision'] != 'research':
+            raise ResearchError('追加読解計画はresearchでのみ指定してください。')
+        if result["decision"] == "research" and not (result["requested_searches"] or result['reading_requests']):
             raise ResearchError("再調査の具体的な検索方針がありません。")
     elif kind == "decision":
         if result["choice_id"] not in {choice["choice_id"] for choice in data["choices"]}:
@@ -352,13 +370,14 @@ def validate_semantics(kind, data, result):
 from .selection import PROMPT as SELECTION_PROMPT
 PROMPTS['selection'] = SELECTION_PROMPT
 PROMPT_VERSIONS = {kind: 2 for kind in PROMPTS}
-PROMPT_VERSIONS['selection'] = 2
-PROMPT_VERSIONS["redesign"] = 3
-PROMPT_VERSIONS["draft"] = 4
+PROMPT_VERSIONS['selection'] = 3
+PROMPT_VERSIONS['reading'] = 3
+PROMPT_VERSIONS["redesign"] = 4
+PROMPT_VERSIONS["draft"] = 5
 
 from .verification import PROMPT as VERIFY_PROMPT
 PROMPTS["verify"] = VERIFY_PROMPT
-PROMPT_VERSIONS["verify"] = 12
+PROMPT_VERSIONS["verify"] = 13
 
 PROMPTS["revise_draft"] = (
     "Revise the supplied English manuscript to address the supplied citation/fact verification issues. "
@@ -373,7 +392,7 @@ PROMPTS["revise_draft"] = (
     "supplied E IDs; the host adds citations. Do not claim that the fix is verified: it will be verified "
     "and reviewed again, including prior unresolved issues."
 )
-PROMPT_VERSIONS["revise_draft"] = 4
+PROMPT_VERSIONS["revise_draft"] = 5
 PROMPTS["revise_draft"] += " Use ledger_fact with empty evidence_ids for factual research-record statements; keep scientific facts separately cited. Do not infer absence of unrecorded activity."
 
 PROMPT_VERSIONS["review"] = 6
@@ -384,3 +403,4 @@ PROMPTS["review"] += " Ledger claims are separately host-checked against ledger_
 PROMPTS["review"] += " Audit the distinction between epistemic limitations and concrete activity assertions: unresolved novelty or unestablished benefits do not require invented ledger metrics, while claims that actions were not performed require real records. Inspect both text and qualifications for metadata-only paper IDs, evidence status/relation, and every reading/document-to-paper mapping. Do not accept a broad claim merely because one subset of its checks passes."
 
 PROMPTS["revise_draft"] += " If a past action cannot be checked from recorded activity, remove the unnecessary action claim or explicitly state that its execution is unconfirmed; do not invent an E citation or relabel an asserted fact to evade verification. Epistemic limitations may remain as honest limitations without claiming that an action was performed."
+PROMPTS["revise_draft"] += " Describe checked/unchecked as recorded statuses; unchecked alone does not prove a human has never reviewed the source."
