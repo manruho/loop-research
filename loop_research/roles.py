@@ -85,7 +85,7 @@ REDESIGN = obj(
     parent_claim_ids=IDS, evidence_ids=IDS, assumptions=NOTES, counterarguments=NOTES,
     novelty=TEXT, open_questions=NOTES, requested_searches=array(QUERY, maximum=5),
     issue_responses=array(obj(issue_id=string(minimum=1, maximum=30), response=TEXT,
-                              remaining_uncertainty=TEXT), maximum=20),
+                              remaining_uncertainty=TEXT), maximum=150),
 )
 DECISION = obj(choice_id=string(minimum=1, maximum=30), reason=TEXT, uncertainty=TEXT)
 
@@ -167,6 +167,10 @@ PROMPTS = {
         "revise its scope and premises; fork/merge if another position is needed; withdraw if the contribution "
         "collapses; hold if it needs human judgment. Record responses and remaining uncertainty for "
         "all supplied blocking issues. Use only given evidence IDs, never disputed/inaccessible evidence. "
+        "issue_responses may contain only IDs in issues (also listed in allowed_issue_ids), once each. "
+        "Include persistent historical issues supplied there. Resolved or not-applicable assessments "
+        "in review are historical context, not response targets. If validation_feedback is present, "
+        "correct that host contract error. "
         "A revised thesis must actually differ from the old one. Do not assert that a repair is proven; "
         "new drafts will be reviewed again."
     ),
@@ -312,6 +316,7 @@ def validate_semantics(kind, data, result):
 
 
 PROMPT_VERSIONS = {kind: 2 for kind in PROMPTS}
+PROMPT_VERSIONS["redesign"] = 3
 
 from .verification import PROMPT as VERIFY_PROMPT
 PROMPTS["verify"] = VERIFY_PROMPT

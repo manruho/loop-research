@@ -357,8 +357,21 @@ class ResearchWorkflow:
                 raise ResearchError("再設計の対象となる査読がありません。")
             common["context"] = self.context()
             common["review"] = {"id": review["id"], "content": review["content"]}
+            prior_ids = {issue["id"] for issue in review["input"].get("prior_issues", [])}
+            persistent_ids = {item["issue_id"] for item in review["content"]["prior_issue_assessments"]
+                              if item["status"] == "persists" and item["issue_id"] in prior_ids}
             common["issues"] = [issue for issue in self.store.list_issues()
-                        if issue["review_id"] == review["id"] and issue["status"] not in ("addressed", "rejected", "not_applicable")]
+                        if (issue["review_id"] == review["id"] or issue["id"] in persistent_ids)
+                        and issue["status"] not in ("addressed", "rejected", "not_applicable")]
+            common["allowed_issue_ids"] = [issue["id"] for issue in common["issues"]]
+            for task in reversed(self.store.list_tasks()):
+                if task["kind"] != "redesign" or task["status"] != "failed":
+                    continue
+                previous = self.store.show_task(task["id"])
+                prior_input = previous["input"]["data"]
+                if prior_input.get("basis") == common["basis"] and prior_input.get("review", {}).get("id") == review["id"]:
+                    common["validation_feedback"] = {"task_id": task["id"], "error": previous["error"]}
+                    break
             return common
         raise ResearchError("研究作業の種類が不正です。")
 

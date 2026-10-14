@@ -174,6 +174,66 @@ class HarnessAcceptance(unittest.TestCase):
         with self.assertRaises(ResearchError):
             roles.validate_semantics("review", data, review)
 
+    def test_redesign_carries_only_explicitly_persistent_unresolved_prior_issues(self):
+        workflow, engine, _ = self.run_study(FixtureEngine(repair=True))
+        review = workflow.latest_relevant_review()
+        old = dict(self.store.list_issues()[0], status="open")
+        closed = dict(old, id="I900", status="addressed")
+        unrelated = dict(old, id="I901")
+        current = dict(old, id="I902", review_id=review["id"])
+        review["input"]["prior_issues"] = [old, closed, unrelated]
+        review["content"]["prior_issue_assessments"] = [
+            {"issue_id": old["id"], "status": "persists"},
+            {"issue_id": closed["id"], "status": "resolved"},
+            {"issue_id": "I903", "status": "persists"},
+        ]
+        foreign = dict(old, id="I903")
+        with patch.object(workflow, "latest_relevant_review", return_value=review), \
+                patch.object(self.store, "list_issues", return_value=[old, closed, unrelated, current, foreign]):
+            data = workflow.data_for("redesign")
+        self.assertEqual(data["allowed_issue_ids"], [old["id"], current["id"]])
+        result, _ = engine.execute("redesign", data, "", roles.REDESIGN)
+        result["decision"] = "hold"
+        roles.validate_semantics("redesign", data, result)
+        for bad_id in (closed["id"], unrelated["id"], foreign["id"], old["id"]):
+            invalid = json.loads(json.dumps(result))
+            invalid["issue_responses"].append(dict(invalid["issue_responses"][0], issue_id=bad_id))
+            with self.assertRaises(ResearchError):
+                roles.validate_semantics("redesign", data, invalid)
+        result["issue_responses"] = result["issue_responses"][1:]
+        with self.assertRaises(ResearchError):
+            roles.validate_semantics("redesign", data, result)
+
+    def test_redesign_can_respond_to_more_than_twenty_blocking_issues(self):
+        from loop_research.schema import validate
+        workflow, engine, _ = self.run_study()
+        data = workflow.data_for("redesign")
+        data["issues"] = [{"id": f"I{i:03}", "severity": "major"} for i in range(1, 52)]
+        result, _ = engine.execute("redesign", data, "", roles.REDESIGN)
+        validate(result, roles.REDESIGN)
+        roles.validate_semantics("redesign", data, result)
+
+    def test_failed_redesign_feedback_is_scoped_to_current_review(self):
+        workflow, engine, _ = self.run_study()
+        execute = engine.execute
+
+        def invalid(kind, data, prompt, schema, on_spawn=None):
+            result, metadata = execute(kind, data, prompt, schema, on_spawn)
+            result["issue_responses"] = [{"issue_id": "I999", "response": "Invalid target",
+                                          "remaining_uncertainty": "No repair verified"}]
+            return result, metadata
+
+        with patch.object(engine, "execute", side_effect=invalid), contextlib.redirect_stderr(io.StringIO()):
+            with self.assertRaises(ResearchError):
+                workflow.perform("redesign")
+        failed = self.store.list_tasks()[-1]
+        data = workflow.data_for("redesign")
+        self.assertEqual(data["validation_feedback"]["task_id"], failed["id"])
+        review = workflow.latest_relevant_review()
+        review["id"] = "V999"
+        with patch.object(workflow, "latest_relevant_review", return_value=review):
+            self.assertNotIn("validation_feedback", workflow.data_for("redesign"))
+
     def test_late_result_cannot_overwrite_human_question_change(self):
         class ChangingEngine(FixtureEngine):
             def execute(engine, kind, data, prompt, schema, on_spawn=None):
