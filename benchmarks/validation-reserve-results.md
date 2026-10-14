@@ -19,7 +19,7 @@ This is a wall-time envelope, not a guarantee of successful generation. A timeou
 
 ## Regressions
 
-The full local suite passed **115 tests**. Thirteen new tests cover allocation/caps, independent-model routing under the envelope, stable cache keys as the clock advances, stopping without a draft rather than bypassing validation, history-preserving resume, prioritizing an existing draft's audit, deadline cleanup, phase timeout classification, keeping reservations when starting a new research cycle after review, compact selection cache consistency, and bounded contract repair without repeating transport failures or bypassing the review reservation. Synthetic fixtures establish software behavior, not research quality.
+The full local suite passed **116 tests**. Fourteen new tests cover allocation/caps, independent-model routing under the envelope, stable cache keys as the clock advances, stopping without a draft rather than bypassing validation, history-preserving resume, prioritizing an existing draft's audit, deadline cleanup, phase timeout classification, keeping reservations when starting a new research cycle after review, compact selection cache consistency, and bounded contract repair without repeating transport failures or bypassing the review reservation, and a preparation error before any task exists. Synthetic fixtures establish software behavior, not research quality.
 
 ## Replay protocol
 
@@ -78,7 +78,7 @@ Reported input/output/reasoning tokens for this continuation were 49,135 / 8,723
 | Contract correction | Exact-span rejection preserved; separate corrected verification/review completed | One frozen unattended 600-second end-to-end success |
 | Scientific quality | Partial/undetermined checks and major findings retained; no finalization | Academic validity, human approval, or superiority over ordinary Codex |
 
-[Aggregate counters, statuses, and source hashes](validation-reserve-measurements.json) retain all attempts. Both Python 3.10 and 3.12 CI passed, and the final local suite passed 115 tests. Further time allocation changes should be evaluated across more questions and repeated runs with independent quality scoring, rather than optimizing this one pilot's completion rate.
+[Aggregate counters, statuses, and source hashes](validation-reserve-measurements.json) retain all attempts. Both Python 3.10 and 3.12 CI passed, and the final local suite passed 116 tests. Further time allocation changes should be evaluated across more questions and repeated runs with independent quality scoring, rather than optimizing this one pilot's completion rate.
 
 ```bash
 python3 -m loop_research eval run \

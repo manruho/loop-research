@@ -1043,9 +1043,10 @@ class ResearchWorkflow:
                     try:
                         self.execute_choice(choice)
                     except ResearchError as exc:
-                        failed = self.store.show_task(self.store.list_tasks()[-1]['id']) if choice['kind'] == 'verify' else None
+                        tasks = self.store.list_tasks() if choice['kind'] == 'verify' else []
+                        failed = self.store.show_task(tasks[-1]['id']) if tasks else None
                         if (isinstance(exc, EngineFailure) and self.run_seconds is not None
-                                and choice['kind'] == 'verify' and not verification_repairs
+                                and failed and choice['kind'] == 'verify' and not verification_repairs
                                 and failed['kind'] == 'verify' and failed['status'] == 'failed'
                                 and failed['result'] is not None and not failed['input']['data'].get('validation_feedback')):
                             verification_repairs += 1

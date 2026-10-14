@@ -205,3 +205,14 @@ class TimeBudget(unittest.TestCase):
         self.assertEqual(engine.calls.count('verify'), 1)
         self.assertNotIn('review', engine.calls)
         self.assertEqual(result['state']['status'], 'needs_human')
+
+    def test_preparation_error_without_a_task_is_preserved(self):
+        w = ResearchWorkflow(self.store, FixtureEngine())
+        choice = {'choice_id': 'choice_01', 'kind': 'verify', 'parameters': {}, 'reason': 'Synthetic preparation failure'}
+        with patch.object(w, 'choices', return_value=[choice]), \
+             patch.object(w, 'execute_choice', side_effect=ResearchError('Synthetic missing input')), \
+             contextlib.redirect_stderr(io.StringIO()):
+            result = w.run(1, max_seconds=600)
+        self.assertEqual(result['state']['status'], 'needs_human')
+        self.assertEqual(result['state']['reason'], 'Synthetic missing input')
+        self.assertEqual(self.store.list_tasks(), [])
