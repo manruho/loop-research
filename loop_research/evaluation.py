@@ -364,12 +364,17 @@ def import_scores(output, path):
 
 def identifiers(text):
     found = set()
-    for value in re.findall(r"(?:arxiv\.org/(?:abs|pdf)/|arxiv:)([0-9]{4}\.[0-9]{4,5})(?:v[0-9]+)?", text, re.I):
+    for value in re.findall(r"(?:arxiv\.org/(?:abs|pdf|html)/|arxiv:)([0-9]{4}\.[0-9]{4,5})(?:v[0-9]+)?", text, re.I):
         found.add("arxiv:" + value)
+    for value in re.findall(r'aclanthology\.org/((?:[0-9]{4}\.[a-z0-9.-]+|[a-z][0-9]{2}-[0-9]+))', text, re.I):
+        found.add('acl:' + value.lower().removesuffix('.pdf').rstrip('.'))
     for value in re.findall(r"10\.\d{4,9}/[^\s<>\]\)\"]+", text, re.I):
         value = value.rstrip(".,;:")
         arxiv = re.fullmatch(r"10\.48550/arxiv\.([0-9]{4}\.[0-9]{4,5})(?:v[0-9]+)?", value, re.I)
         found.add("arxiv:" + arxiv[1] if arxiv else "doi:" + value.lower())
+        acl = re.fullmatch(r'10\.(?:18653|3115)/v1/([a-z0-9.-]+)', value, re.I)
+        if acl:
+            found.add('acl:' + acl[1].lower())
     return found
 
 

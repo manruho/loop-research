@@ -729,7 +729,7 @@ class ResearchWorkflow:
                 for page in wanted:
                     if page not in seen:
                         add("reading", "取得資料の関連箇所を読み、原文・解釈・未確認事項を分けて記録", document=doc["id"], page=page)
-        if not pending:
+        if not pending and not (checkpoint and not first_review and any(c['kind'] in ('fetch', 'reading') for c in result)):
             attempted = {(row["provider"], row["query"]) for row in self.store.list_searches()}
             graph_new = self.store.db.execute("SELECT COUNT(DISTINCT paper_id) FROM search_results WHERE search_id IN (SELECT id FROM searches WHERE query LIKE 'graph:%') AND paper_id NOT IN (SELECT paper_id FROM search_results WHERE search_id IN (SELECT id FROM searches WHERE query NOT LIKE 'graph:%'))").fetchone()[0]
             seeds = [p for p in self.ranked_papers() if p["provider"] == "manual" or any(
@@ -969,7 +969,7 @@ class ResearchWorkflow:
                     elif all(item["kind"] in ("search", "related", "fetch", "reading") for item in choices):
                         # The orientation/search plan and host ranking already determine these operations.
                         # Execute discovery before acquisition; don't spend an extra model call per source.
-                        order = {"search": 0, "reading": 1, "related": 2, "fetch": 3}
+                        order = {"search": 0, "reading": 1, "fetch": 2, "related": 3}
                         choice = min(choices, key=lambda item: order[item["kind"]])
                     else:
                         decision = self.perform("decision", choices=choices)
