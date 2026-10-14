@@ -89,8 +89,15 @@ class ResearchWorkflow:
         return CodexEngine(settings["review_model"] if reviewer else settings["model"], timeout,
                            settings["review_effort"] if reviewer else settings["reasoning_effort"])
 
-    def prompt_for(self, kind):
-        return budget.prompt(kind, roles.PROMPTS[kind]) if self.run_seconds is not None else roles.PROMPTS[kind]
+    def prompt_for(self, kind, data=None):
+        prompt = budget.prompt(kind, roles.PROMPTS[kind]) if self.run_seconds is not None else roles.PROMPTS[kind]
+        if kind == 'verify' and data and data.get('validation_feedback'):
+            prompt += ('\nVALIDATION REPAIR: The previous result failed the host contract and was not applied. '
+                       'Correct validation_feedback using the original supplied manuscript and sources. '
+                       'Copy exact contiguous assertion/source spans and their occurrences; never align paraphrases approximately. '
+                       'Reinspect ALL required targets and retain unsupported/partial/undetermined judgments and uncertainty. '
+                       'Do not alter the manuscript, infer missing evidence, or lower the support standard to make validation pass.')
+        return prompt
 
     def current_verification(self):
         draft = self.current_artifact("draft")
@@ -369,6 +376,15 @@ class ResearchWorkflow:
                                      "scope": context["scope"], "human_guidance": context["human_guidance"],
                                      "evidence": {eid: {"claim_id": item["claim_id"], "level": item["level"], "status": item["status"]}
                                                   for eid, item in context["evidence"].items()}}
+                for entry in reversed(self.store.list_tasks()):
+                    if entry['kind'] != 'verify' or entry['status'] != 'failed':
+                        continue
+                    failed = self.store.show_task(entry['id'])
+                    prior = dict(failed['input']['data'])
+                    prior.pop('validation_feedback', None)
+                    if failed['result'] is not None and prior == common:
+                        common['validation_feedback'] = {'task_id': failed['id'], 'error': failed['error']}
+                        break
             else:
                 verified = self.current_verification()
                 if not verified:
@@ -413,7 +429,7 @@ class ResearchWorkflow:
             self.store.db.rollback()
             raise
         config = self.engine_for(kind).config
-        key = digest({"kind": kind, "data": data, "prompt": self.prompt_for(kind), "schema": SCHEMAS[kind],
+        key = digest({"kind": kind, "data": data, "prompt": self.prompt_for(kind, data), "schema": SCHEMAS[kind],
                       "prompt_version": roles.PROMPT_VERSIONS[kind], "model": config.get("model"),
                       "reasoning_effort": config.get("reasoning_effort")})
         return data, key, fingerprint
@@ -431,7 +447,7 @@ class ResearchWorkflow:
         if self.run_seconds is not None:
             config['run_budget'] = budget.allocation(kind, self.run_seconds, self.deadline - time.monotonic(),
                                                     self.store.study_state()['settings']['timeout'])
-        prompt = self.prompt_for(kind)
+        prompt = self.prompt_for(kind, data)
         task = self.store.start_task(kind, key, data, prompt, SCHEMAS[kind], config, fingerprint)
         task_id = task["id"]
         print(f"{task_id}: {kind}を実行しています…", file=sys.stderr, flush=True)
@@ -983,6 +999,7 @@ class ResearchWorkflow:
             self.store.ensure_anchor()
             completed = 0
             unchanged = 0
+            verification_repairs = 0
             try:
                 for step in range(steps):
                     if self.deadline is not None and time.monotonic() >= self.deadline:
@@ -1026,6 +1043,14 @@ class ResearchWorkflow:
                     try:
                         self.execute_choice(choice)
                     except ResearchError as exc:
+                        failed = self.store.show_task(self.store.list_tasks()[-1]['id']) if choice['kind'] == 'verify' else None
+                        if (isinstance(exc, EngineFailure) and self.run_seconds is not None
+                                and choice['kind'] == 'verify' and not verification_repairs
+                                and failed['kind'] == 'verify' and failed['status'] == 'failed'
+                                and failed['result'] is not None and not failed['input']['data'].get('validation_feedback')):
+                            verification_repairs += 1
+                            print('検証の契約違反を保存。予約時間を維持して一度だけ訂正を依頼します。', file=sys.stderr, flush=True)
+                            continue
                         if choice["kind"] not in ("search", "fetch", "related"):
                             raise
                         print(f"{choice['kind']}の失敗を保存: {exc}", file=sys.stderr, flush=True)

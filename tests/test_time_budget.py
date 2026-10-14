@@ -9,6 +9,7 @@ from unittest.mock import patch
 
 from loop_research import budget, roles
 from loop_research.common import ResearchError
+from loop_research.engine import EngineFailure
 from loop_research.store import ResearchStore
 from loop_research.workflow import ResearchWorkflow
 from .fixtures import FixtureEngine, fake_search, fake_fetch
@@ -149,3 +150,58 @@ class TimeBudget(unittest.TestCase):
         with contextlib.redirect_stderr(io.StringIO()):
             self.assertEqual(w.perform('selection')['id'], task['id'])
         self.assertEqual(engine.calls.count('selection'), 1)
+
+    def repair_trial(self, *, always_invalid=False, exhaust=False, transport=False):
+        engine = FixtureEngine()
+        original = engine.execute
+        clock, inputs = [0.0], []
+        def execute(kind, data, prompt, schema, on_spawn=None):
+            raw, execution = original(kind, data, prompt, schema, on_spawn)
+            if kind == 'verify':
+                if transport:
+                    raise EngineFailure('Synthetic transport failure without a model result')
+                inputs.append((data, prompt))
+                if always_invalid or len(inputs) == 1:
+                    raw['facts'][0]['text'] = 'A paraphrase that is absent from the manuscript.'
+                    if exhaust:
+                        clock[0] = 520
+            return raw, execution
+        w = ResearchWorkflow(self.store, engine)
+        with patch.object(engine, 'execute', side_effect=execute), \
+             patch('loop_research.workflow.time.monotonic', side_effect=lambda: clock[0]), \
+             patch('loop_research.workflow.search_papers', fake_search), \
+             patch('loop_research.workflow.fetch_paper', fake_fetch), contextlib.redirect_stderr(io.StringIO()):
+            result = w.run(100, max_seconds=600)
+        return w, engine, inputs, result
+
+    def test_one_contract_repair_retains_failure_and_original_gate(self):
+        w, engine, inputs, result = self.repair_trial()
+        self.assertEqual(engine.calls.count('verify'), 2)
+        self.assertNotIn('validation_feedback', inputs[0][0])
+        self.assertIn('validation_feedback', inputs[1][0])
+        self.assertIn('VALIDATION REPAIR', inputs[1][1])
+        self.assertEqual(inputs[0][0]['source_spans'], inputs[1][0]['source_spans'])
+        tasks = [t for t in self.store.list_tasks() if t['kind'] == 'verify']
+        self.assertEqual([t['status'] for t in tasks], ['failed', 'completed'])
+        self.assertEqual(len(self.store.list_artifacts('verify')), 1)
+        self.assertEqual(result['state']['status'], 'ready_for_human')
+        self.assertIsNotNone(w.latest_relevant_review())
+
+    def test_repeated_bad_spans_stop_after_one_repair(self):
+        _, engine, _, result = self.repair_trial(always_invalid=True)
+        self.assertEqual(engine.calls.count('verify'), 2)
+        self.assertNotIn('review', engine.calls)
+        self.assertEqual(result['state']['status'], 'needs_human')
+        self.assertEqual(self.store.list_artifacts('verify'), [])
+
+    def test_repair_cannot_spend_review_reserve(self):
+        _, engine, _, result = self.repair_trial(exhaust=True)
+        self.assertEqual(engine.calls.count('verify'), 1)
+        self.assertEqual(result['state']['status'], 'budget_exhausted')
+        self.assertNotIn('review', engine.calls)
+
+    def test_transport_failure_is_not_a_contract_repair(self):
+        _, engine, _, result = self.repair_trial(transport=True)
+        self.assertEqual(engine.calls.count('verify'), 1)
+        self.assertNotIn('review', engine.calls)
+        self.assertEqual(result['state']['status'], 'needs_human')
