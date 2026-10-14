@@ -487,7 +487,21 @@ class ResearchWorkflow:
         return {'plan_id': plan['id'], 'readings': readings,
                 'pending_paper_ids': [r['paper_id'] for r in plan['content'].get('reading_requests', []) if r['paper_id'] not in seen],
                 'pending_queries': [q for q in plan['content']['requested_searches'] if (q['provider'], q['query']) not in attempted],
+                'handoff_reason': self.research_handoff(len(readings)) or 'inspection_progress',
                 'notice': 'Specified passages inspected, not full-paper reading, relevance proof or issue resolution. Search attempts are not successful coverage.'}
+
+    def research_handoff(self, count):
+        settings = self.store.study_state()['settings']
+        checkpoint = settings['draft_checkpoint_readings']
+        if not checkpoint or not count:
+            return None
+        if count >= checkpoint:
+            return 'reading_checkpoint'
+        if self.run_seconds is not None and self.deadline is not None:
+            envelope = budget.allocation('draft', self.run_seconds, self.deadline - time.monotonic(), settings['timeout'])
+            if envelope['remaining_seconds'] - envelope['reserved_seconds'] <= min(settings['timeout'], self.run_seconds * .15):
+                return 'time_reserve'
+        return None
 
     def revision_plan(self, cid):
         row = self.store.db.execute('SELECT task_id FROM profiles WHERE claim_id=? AND revision=?',
@@ -507,18 +521,18 @@ class ResearchWorkflow:
         settings = self.store.study_state()['settings']
         progress = self.plan_progress(plan)
         count = len(progress['readings'])
-        reserve = self.deadline is not None and self.deadline - time.monotonic() < 4 * settings['timeout']
-        if count and (settings['draft_checkpoint_readings'] and count >= settings['draft_checkpoint_readings'] or reserve):
+        if self.research_handoff(count):
             return None  # Hand new evidence back to redesign, not another broad search.
         def choice(kind, reason, **parameters):
             return [{'choice_id': 'choice_01', 'kind': kind, 'parameters': parameters, 'reason': reason}]
         requested = [r['paper_id'] for r in plan['content'].get('reading_requests', [])]
         signatures = {(q['provider'], q['query']) for q in plan['content']['requested_searches']}
+        query_texts = {q['query'] for q in plan['content']['requested_searches']}
         if not requested:
-            if progress['pending_queries']:
-                q = progress['pending_queries'][0]
-                if q in self.pending_queries():
-                    return choice('search', q['purpose'], query=q['query'], provider=q['provider'])
+            goal_queries = [q for q in self.pending_queries() if q['query'] in query_texts]
+            if goal_queries:
+                q = goal_queries[0]
+                return choice('search', q['purpose'], query=q['query'], provider=q['provider'])
             if settings['semantic_selection'] and not self.cached_selection():
                 return choice('selection', '査読指摘に必要な追加調査の候補を選別する')
             requested = [p['id'] for p in self.ranked_papers() if any(
@@ -538,12 +552,18 @@ class ResearchWorkflow:
                 if settings['semantic_selection'] and not self.cached_selection(doc['id']):
                     return choice('selection', '指摘の調査目的に関連する指定資料のページを選ぶ', document=doc['id'])
                 seen = self.read_pages(doc['id'])
-                for page in self.ranked_pages(doc['id'])[:settings['pages_per_document']]:
+                wanted = self.ranked_pages(doc['id'])[:settings['pages_per_document']]
+                if not wanted and pid in {r['paper_id'] for r in plan['content'].get('reading_requests', [])}:
+                    # Negative snippet triage is not proof a specifically requested paper is irrelevant.
+                    first = next((p['page'] for p in self.store.show_document(doc['id'])['pages'] if p['characters']), None)
+                    if first and first not in seen and len(seen) < settings['pages_per_document']:
+                        return choice('reading', '選別で関連箇所が見つからない指定資料の冒頭を限定確認する', document=doc['id'], page=first)
+                for page in wanted:
                     if page not in seen:
                         return choice('reading', '未解決指摘のために指定資料を読解する', document=doc['id'], page=page)
         # Known papers take precedence; only then use the plan's unexecuted search requests.
         for query in self.pending_queries():
-            if (query['provider'], query['query']) in signatures:
+            if query['query'] in query_texts:
                 return choice('search', query['purpose'], query=query['query'], provider=query['provider'])
         return None
 

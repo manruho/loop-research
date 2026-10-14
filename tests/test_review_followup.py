@@ -186,3 +186,39 @@ class ReviewFollowup(unittest.TestCase):
                    'reason': 'Synthetic state/activity boundary'}
             result = ledger.normalize(data, [raw], {'B001': {'text': text}})
             self.assertEqual(result[0]['verdict'], expected)
+
+    def test_disabling_checkpoint_also_disables_early_research_wave_handoff(self):
+        plan = self.plan()
+        pages = ['In this synthetic fixture, participants checked an answer for two minutes.',
+                 'A second synthetic passage describes a rival reporting framework.']
+        self.store.save_document(None, 'P002', '\n'.join(pages).encode(), 'text', 'https://fixture.invalid/rival', pages, 'synthetic-v1')
+        with contextlib.redirect_stderr(io.StringIO()):
+            self.workflow.perform('reading', document='D002', page=1)
+        self.store.configure_study('Disable early handoff', settings={'draft_checkpoint_readings': 0, 'pages_per_document': 2})
+        import time
+        self.workflow.run_seconds, self.workflow.deadline = 600, time.monotonic() + 600
+        choices = self.workflow.research_choices(plan)
+        self.assertIsNotNone(choices)
+        self.assertEqual(choices[0]['kind'], 'reading')
+        self.assertEqual(choices[0]['parameters']['page'], 2)
+
+    def test_handoff_uses_actual_reserved_tail_not_four_maximum_timeouts(self):
+        self.store.configure_study('Two reading wave', settings={'draft_checkpoint_readings': 2})
+        self.workflow.run_seconds, self.workflow.deadline = 1200, 1000
+        with patch('loop_research.workflow.time.monotonic', return_value=100):
+            self.assertIsNone(self.workflow.research_handoff(1))
+            self.assertEqual(self.workflow.research_handoff(2), 'reading_checkpoint')
+        with patch('loop_research.workflow.time.monotonic', return_value=700):
+            self.assertEqual(self.workflow.research_handoff(1), 'time_reserve')
+
+    def test_negative_snippet_triage_does_not_skip_requested_paper_inspection(self):
+        plan = self.plan()
+        self.target_fetch(self.store, 'P002')
+        self.store.configure_study('Semantic screen', settings={'semantic_selection': 1})
+        result = {'content': {'judgments': [{'candidate_id': 'D002:1', 'relevance': 'unrelated', 'reason': 'Synthetic triage'}]}}
+        with patch.object(self.workflow, 'cached_selection', return_value=result):
+            choices = self.workflow.research_choices(plan)
+        self.assertEqual([c['kind'] for c in choices], ['reading'])
+        self.assertEqual(choices[0]['parameters'], {'document': 'D002', 'page': 1})
+        self.assertEqual(self.store.list_issues()[0]['status'], 'investigating')
+        self.assertEqual(self.workflow.plan_progress(plan)['readings'], [])
