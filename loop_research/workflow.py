@@ -890,7 +890,8 @@ class ResearchWorkflow:
                 else:
                     add('redesign', '未解決指摘と追加読解に基づいて研究計画・主張を再設計する')
                 return result
-            if self.revision_plan(cid) and state['phase'] in ('argument', 'draft'):
+            if state['phase'] in ('argument', 'draft') and (self.revision_plan(cid) or any(
+                e['document_source'] for e in self.context(only_claim=cid)['evidence'].values())):
                 if self.unlinked_evidence(cid):
                     add('ground', '改訂した立場へ取得済み根拠を結び付ける', claim=cid)
                 elif not self.current_artifact('outline'):
