@@ -15,10 +15,12 @@ from .common import ResearchError, identifier, label, now
 from .engine import CodexEngine, EngineFailure, process_alive
 from .literature import fetch_paper, search_papers
 from .schema import validate
+from . import selection
 from .workflow_store import digest, encoded
 
 
 SCHEMAS = {
+    'selection': selection.SCHEMA,
     "orientation": roles.ORIENTATION, "reading": roles.READING, "exploration": roles.EXPLORATION,
     "comparison": roles.COMPARISON, "outline": roles.OUTLINE, "draft": roles.DRAFT, "revise_draft": roles.DRAFT,
     "review": roles.REVIEW, "verify": verification.VERIFY, "redesign": roles.REDESIGN, "decision": roles.DECISION,
@@ -256,6 +258,8 @@ class ResearchWorkflow:
 
     def data_for(self, kind, document=None, page=None, choices=None):
         state = self.store.study_state()
+        if kind == 'selection':
+            return selection.data(self.store, self.human_guidance(), document)
         if kind == "orientation":
             return {"question": state["question"], "audience": state["audience"], "venue": state["venue"],
                     "preferred_provider": state["settings"]["provider"], "query_limit": state["settings"]["query_limit"],
@@ -295,6 +299,9 @@ class ResearchWorkflow:
             if not outline:
                 raise ResearchError("現行状態に対応する論証を先に作成してください。")
             common["outline"] = {"id": outline["id"], "content": outline["content"]}
+            has_review = any(self.store.show_artifact(r['id'])['input'].get('context', {}).get('question') == state['question']
+                             for r in self.store.list_artifacts('review'))
+            common['discovery_deferred'] = bool(state['settings']['draft_checkpoint_readings'] and not has_review)
             from . import ledger
             common["ledger_snapshot"] = ledger.snapshot(self.store, self.scope(), context)
             if kind == "draft":
@@ -331,6 +338,7 @@ class ResearchWorkflow:
                 if writer["config"].get("model") == state["settings"]["review_model"]:
                     raise ResearchError("現行草稿の執筆モデルと査読モデルが同じです。別の査読モデルを指定してください。")
             common["draft"] = {"id": draft["id"], "content": draft["content"]}
+            common['discovery_deferred'] = draft['input'].get('discovery_deferred', False)
             common["contract_version"] = roles.PROMPT_VERSIONS[kind]
             if kind == "verify":
                 spans = {}
@@ -348,6 +356,7 @@ class ResearchWorkflow:
                                   "source_url": doc["source_url"] if doc["source_url"].startswith(("https://", "http://")) else "local immutable document snapshot"}
                 from . import ledger
                 common["ledger_snapshot"] = ledger.snapshot(self.store, self.scope(), context, draft=draft)
+                common['verification_targets'] = roles.verification_targets(draft['content'])
                 common["source_spans"] = spans
                 # Verification needs actual manuscript and source spans, not repeated abstracts/quotes.
                 common["context"] = {"question": context["question"], "claims": context["claims"],
@@ -485,6 +494,9 @@ class ResearchWorkflow:
         return seen
 
     def ranked_pages(self, document):
+        chosen = self.cached_selection(document)
+        if self.store.study_state()['settings']['semantic_selection'] and chosen:
+            return [int(cid.rsplit(':', 1)[1]) for cid in selection.order(chosen['content'])]
         orientation = self.orientation()
         terms = orientation["content"]["key_terms"] if orientation else []
         words = {word.lower() for term in terms for word in re.findall(r"[A-Za-z]{4,}", term)}
@@ -501,7 +513,27 @@ class ResearchWorkflow:
             scored.append((score, row["page"]))
         return [page for _, page in sorted(scored, key=lambda item: (-item[0], item[1]))]
 
+    def cached_selection(self, document=None):
+        data = self.data_for('selection', document=document)
+        config = self.engine_for('selection').config
+        key = digest({'kind': 'selection', 'data': data, 'prompt': roles.PROMPTS['selection'],
+                      'schema': SCHEMAS['selection'], 'prompt_version': roles.PROMPT_VERSIONS['selection'],
+                      'model': config.get('model'), 'reasoning_effort': config.get('reasoning_effort')})
+        return self.store.latest_artifact('selection', key)
+
     def ranked_papers(self):
+        if self.store.study_state()['settings']['semantic_selection']:
+            chosen = self.cached_selection()
+            if chosen:
+                papers = {p['id']: p for p in self.store.list_papers()}
+                manual = [p for p in papers.values() if p['provider'] == 'manual']
+                ids = selection.order(chosen['content'])
+                seen = {p['id'] for p in manual}
+                # Unscreened candidates remain available to subsequent selection.
+                return manual + [papers[cid] for cid in ids if cid not in seen]
+        return self.lexical_papers()
+
+    def lexical_papers(self):
         orientation = self.orientation()
         terms = orientation["content"]["key_terms"] if orientation else []
         words = {word.lower() for term in terms for word in re.findall(r"[A-Za-z]{4,}", term)}
@@ -649,9 +681,28 @@ class ResearchWorkflow:
             add("orientation", "問いと隣接領域・競合する立場の探索方針を整理する")
             return result
         pending = self.pending_queries()
+        original_pending = pending
         for query in pending:
             add("search", query["purpose"], query=query["query"], provider=query["provider"])
         settings = state["settings"]
+        readings = self.scope()['readings']
+        count = sum(r['research_question'] == state['question'] for r in readings)
+        first_review = any(self.store.show_artifact(r['id'])['input'].get('context', {}).get('question') == state['question']
+                           for r in self.store.list_artifacts('review'))
+        checkpoint = settings['draft_checkpoint_readings']
+        searched = sum(not q['query'].startswith('graph:') for q in self.store.list_searches())
+        if checkpoint and not first_review and searched >= min(2, settings['query_limit']) and self.store.list_papers():
+            pending = []
+            result = []
+        reserve = self.deadline is not None and self.deadline - time.monotonic() < 4 * settings['timeout']
+        synthesize = bool(checkpoint and not first_review and count and (count >= checkpoint or reserve)
+                          and self.context()['evidence'])
+        if not synthesize and not pending and settings['semantic_selection'] and self.store.list_papers() and not self.cached_selection():
+            return [{'choice_id': 'choice_01', 'kind': 'selection', 'parameters': {},
+                     'reason': 'メタデータから中心研究・反証研究・不確かな候補を意味的に選別する'}]
+        if synthesize:
+            pending = []
+            result = []
         attempted_papers = {label(row[0], "P") for row in self.store.db.execute("SELECT DISTINCT paper_id FROM fetches")}
         papers = self.ranked_papers()[:settings["paper_limit"]]
         papers += [p for p in self.store.list_papers() if p["id"] in attempted_papers and p["id"] not in {r["id"] for r in papers}]
@@ -670,6 +721,9 @@ class ResearchWorkflow:
                 elif attempts and paper["abstract"] and not any(doc["origin"] == "abstract" for doc in paper["documents"]):
                     add("fetch", "本文の取得失敗を残したまま、抄録だけを別の範囲として確認", paper=item["id"], abstract=True)
             for doc in documents:
+                if not synthesize and not pending and settings['semantic_selection'] and not self.cached_selection(doc['id']):
+                    return [{'choice_id': 'choice_01', 'kind': 'selection', 'parameters': {'document': doc['id']},
+                             'reason': '取得資料の選別用抜粋から論点・反証・限定条件のあるページを選ぶ'}]
                 seen = self.read_pages(doc["id"])
                 wanted = self.ranked_pages(doc["id"])[:settings["pages_per_document"]]
                 for page in wanted:
@@ -688,6 +742,8 @@ class ResearchWorkflow:
                         add("related", "重要な先行研究の引用・被引用関係を限定的に追跡する", paper=seed["id"], direction=direction,
                             limit=settings["citation_limit"], remaining=settings["citation_budget"] - graph_new)
         selected = state["selected_claim_id"]
+        if synthesize:
+            result = []  # Defer discovery, not verification or review; budgets remain unchanged.
         if selected:
             claim = self.store.claim_row(selected)
             if claim["status"] == "held":
@@ -728,6 +784,10 @@ class ResearchWorkflow:
             return result
         context = self.context()
         if not context["evidence"]:
+            if original_pending:
+                query = original_pending[0]
+                add('search', query['purpose'], query=query['query'], provider=query['provider'])
+                return result
             add("consult", "取得・読解できた根拠がありません。文献の追加、検索語の変更、取得不能資料の確認が必要です。")
             return result
         candidates = self.candidates()
@@ -909,7 +969,7 @@ class ResearchWorkflow:
                     elif all(item["kind"] in ("search", "related", "fetch", "reading") for item in choices):
                         # The orientation/search plan and host ranking already determine these operations.
                         # Execute discovery before acquisition; don't spend an extra model call per source.
-                        order = {"search": 0, "related": 1, "fetch": 2, "reading": 3}
+                        order = {"search": 0, "reading": 1, "related": 2, "fetch": 3}
                         choice = min(choices, key=lambda item: order[item["kind"]])
                     else:
                         decision = self.perform("decision", choices=choices)

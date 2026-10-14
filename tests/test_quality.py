@@ -210,7 +210,7 @@ class QualityAcceptance(unittest.TestCase):
     def test_manual_seed_without_search_discovery_is_traversed(self):
         from loop_research.literature import register_paper
         register_paper(self.store, title='Explicitly chosen source', arxiv='2211.09110')
-        self.store.configure_study('Graph', settings={'citation_seeds': 1})
+        self.store.configure_study('Graph', settings={'citation_seeds': 1, 'semantic_selection': 0})
         workflow = ResearchWorkflow(self.store, FixtureEngine())
         orientation = {'content': {'key_terms': [], 'search_queries': []}}
         with patch.object(workflow, 'orientation', return_value=orientation):
@@ -270,7 +270,7 @@ class QualityAcceptance(unittest.TestCase):
                 return result, execution
         workflow = ResearchWorkflow(self.store, Partial())
         with patch("loop_research.workflow.search_papers", fake_search), patch("loop_research.workflow.fetch_paper", fake_fetch), contextlib.redirect_stderr(io.StringIO()):
-            workflow.run(10)
+            workflow.run(12)
             workflow.perform("review")
         self.assertNotEqual(self.store.study_state()["status"], "ready_for_human")
         self.assertTrue(any(i["severity"] == "major" and i["content"]["target_type"] == "fact" for i in self.store.list_issues()))
@@ -302,7 +302,7 @@ class QualityAcceptance(unittest.TestCase):
         self.assertIn("A100 GPUs", result)
 
     def test_citation_discovery_enters_acquisition_and_draft(self):
-        self.store.configure_study("Exercise graph acquisition", settings={"citation_seeds": 1, "citation_limit": 1, "citation_budget": 1, "paper_limit": 1})
+        self.store.configure_study("Exercise graph acquisition", settings={"citation_seeds": 1, "citation_limit": 1, "citation_budget": 1, "paper_limit": 1, 'semantic_selection': 0})
         seed = work("W1", refs=["https://openalex.org/W2"])
         seed["title"] = "Synthetic checking workload seed"
         neighbor = work("W2")

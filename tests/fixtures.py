@@ -20,7 +20,10 @@ class FixtureEngine:
         context = data.get("context", {})
         eids = list(context.get("evidence", {}))
         cids = list(context.get("claims", {}))
-        if kind == "orientation":
+        if kind == 'selection':
+            result = {'judgments': [{'candidate_id': c['id'], 'relevance': 'core', 'reason': 'Synthetic selection'}
+                                     for c in data['candidates']], 'limitations': notes}
+        elif kind == "orientation":
             result = {"interpretation": "架空の評価負担の問い", "domains": ["HCI"],
                       "search_queries": [{"query": "synthetic workload", "provider": "arxiv", "purpose": "仮想資料の探索"}],
                       "key_terms": ["checking workload"], "recommendation": "proceed",
@@ -74,7 +77,7 @@ class FixtureEngine:
             if kind == "revise_draft":
                 result["sections"][1]["blocks"][0]["qualification"] += " The population scope is limited to the inspected synthetic passage."
         elif kind == "verify":
-            from loop_research.roles import blocks
+            from loop_research.roles import verification_blocks as blocks
             facts, coverage = [], []
             for block in blocks(data["draft"]["content"]):
                 factual = block["kind"] == "fact"

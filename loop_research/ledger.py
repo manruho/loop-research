@@ -91,6 +91,7 @@ def normalize(data, claims, manuscript):
             raise ResearchError('実行記録主張のIDまたは対象段落が不正です。')
         ids.add(item['id'])
         item['start'], item['end'] = locate(manuscript[item['block_id']][item['field']], item['text'], item['occurrence'])
+        item['context_id'] = item['block_id'] + '.' + item['field']
         checks = []
         for raw_check in item['checks']:
             check = dict(raw_check)
