@@ -1,0 +1,40 @@
+{
+  "provenance": {
+    "type": "saved model response, not human annotation",
+    "requested_model": "gpt-6-sol",
+    "response_sha256": "8b7e4949d70325a6f3b8d6f50a962b44d0788348da69f2430822a9bde8522096"
+  },
+  "text": "This response used only supplied material, with no tools, new searches, full-paper reading, or independent source verification.",
+  "assertions": [
+    {
+      "text": "This response used only supplied material",
+      "kind": "ledger",
+      "verdict": "undetermined",
+      "reason": "保存された観測記録だけでは、この応答が使った資料の全体を確認できない。"
+    },
+    {
+      "text": "with no tools",
+      "kind": "ledger",
+      "verdict": "partial",
+      "reason": "記録上のauthor_tool_call_countは0だが、記録の完全性とこの応答との同一性が未確立であり、ツール不使用までは確証できない。"
+    },
+    {
+      "text": "new searches",
+      "kind": "ledger",
+      "verdict": "undetermined",
+      "reason": "原文では否定されている。raw_search_responses_suppliedがfalseという記録は、生の検索応答が提供されていないことを示すだけで、新規検索がなかったことは示さない。"
+    },
+    {
+      "text": "full-paper reading",
+      "kind": "ledger",
+      "verdict": "undetermined",
+      "reason": "原文では否定されている。記録された閲覧ページだけでは、論文全体を読まなかったことは確認できない。"
+    },
+    {
+      "text": "independent source verification",
+      "kind": "ledger",
+      "verdict": "undetermined",
+      "reason": "原文では否定されている。独立した原典確認の有無を網羅する活動記録は提供されていない。"
+    }
+  ]
+}

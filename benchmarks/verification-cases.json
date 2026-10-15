@@ -1,0 +1,282 @@
+{
+  "version": 2,
+  "annotation": "Developer-authored diagnostic expectations; not independently human-reviewed gold truth. Exact-span coverage on selected targets, not full manuscript recall. Additional assertions are retained unscored.",
+  "source": {
+    "draft": "A033",
+    "verification": "U034",
+    "review": "V035",
+    "files_sha256": {
+      "draft.md": "0ca1018360c203c80ce9bbc6c5810070be3b206abba5b3b87c444f1ea8b7e5f1",
+      "reviews.json": "1a2399eaac0f20ee2d09f42f8a5b2351c44c88348a45049e1f50d6e4067ccdd1",
+      "ledger-verification.json": "32b0aaf2c2018ce6b9443c3d3f163cbc0e7543d7ced5b231ef5bf56a803b5bda"
+    }
+  },
+  "cases": [
+    {
+      "id": "comparison-omission",
+      "text": "HELM’s abstract frames evaluation around transparency, reports multiple metrics across scenarios, and acknowledges incomplete coverage. Model Cards proposes documentation combining evaluation conditions, intended-use context, and evaluation procedures. Its example smile-detector card excludes emotion inference because the labels concern appearance rather than underlying emotion. BenchRisk explicitly aims to help users identify when to avoid relying on a benchmark. These are substantial precedents for contextual documentation and qualified reliance.",
+      "context": {
+        "scope": "Manuscript summaries only; source passages and full-paper comparison are not supplied."
+      },
+      "expected": [
+        {
+          "text": "These are substantial precedents for contextual documentation and qualified reliance.",
+          "kind": "comparison",
+          "verdict": "undetermined"
+        }
+      ],
+      "provenance": {
+        "draft": "A033",
+        "block": "B003.text",
+        "review": "V035",
+        "issue": "I030"
+      },
+      "annotation_reason": "Individual paper summaries must not hide the substantive comparison; supplied summaries alone do not independently establish it."
+    },
+    {
+      "id": "activity-exclusivity",
+      "text": "This response used only supplied material, with no tools, new searches, full-paper reading, or independent source verification.",
+      "context": {
+        "records": {
+          "raw_search_responses_supplied": false,
+          "author_tool_call_count": 0,
+          "paper_read_pages": {
+            "P001": [
+              1
+            ],
+            "P009": [
+              1,
+              7
+            ],
+            "P020": [
+              1,
+              7
+            ],
+            "P023": [
+              2,
+              6
+            ]
+          }
+        },
+        "scope": "Stored observations only; completeness and identity with this response are unestablished."
+      },
+      "expected": [
+        {
+          "text": "This response used only supplied material",
+          "kind": "ledger",
+          "verdict": "undetermined",
+          "accepted_spans": [
+            "This response used only supplied material, with no tools, new searches, full-paper reading, or independent source verification."
+          ]
+        },
+        {
+          "text": "no tools, new searches, full-paper reading, or independent source verification.",
+          "kind": "ledger",
+          "verdict": "undetermined",
+          "accepted_spans": [
+            "This response used only supplied material, with no tools, new searches, full-paper reading, or independent source verification."
+          ]
+        }
+      ],
+      "provenance": {
+        "draft": "A033",
+        "block": "B009.text",
+        "verification": "U034",
+        "claims": [
+          "G014",
+          "G015",
+          "G016",
+          "G017",
+          "G018"
+        ],
+        "review": "V035",
+        "issues": [
+          "I026",
+          "I027"
+        ]
+      },
+      "annotation_reason": "False raw-search presentation flag is not exclusive material use. Zero observed tool calls and selected pages do not prove absent activity. Preserve the whole negative conjunction."
+    },
+    {
+      "id": "presentation-control",
+      "text": "The supplied ledger records raw_search_responses_supplied as false.",
+      "context": {
+        "records": {
+          "raw_search_responses_supplied": false
+        },
+        "scope": "Stored observations only; no complete activity history or page content is supplied."
+      },
+      "expected": [
+        {
+          "text": "The supplied ledger records raw_search_responses_supplied as false.",
+          "kind": "ledger",
+          "verdict": "supported"
+        }
+      ],
+      "provenance": {
+        "type": "developer-authored paired control",
+        "related_review": "V035",
+        "related_issues": [
+          "I026",
+          "I027",
+          "I003",
+          "I004"
+        ]
+      },
+      "annotation_reason": "This is an explicit assertion about the stored flag, not actual material use."
+    },
+    {
+      "id": "tool-count-control",
+      "text": "The supplied ledger records author_tool_call_count as zero.",
+      "context": {
+        "records": {
+          "author_tool_call_count": 0
+        },
+        "scope": "Stored observations only; no complete activity history or page content is supplied."
+      },
+      "expected": [
+        {
+          "text": "The supplied ledger records author_tool_call_count as zero.",
+          "kind": "ledger",
+          "verdict": "supported"
+        }
+      ],
+      "provenance": {
+        "type": "developer-authored paired control",
+        "related_review": "V035",
+        "related_issues": [
+          "I026",
+          "I027",
+          "I003",
+          "I004"
+        ]
+      },
+      "annotation_reason": "This only claims a recorded count."
+    },
+    {
+      "id": "unchecked-absence",
+      "text": "No human checked E065.",
+      "context": {
+        "records": {
+          "evidence_status": {
+            "E065": "unchecked"
+          }
+        },
+        "scope": "Stored observations only; no complete activity history or page content is supplied."
+      },
+      "expected": [
+        {
+          "text": "No human checked E065.",
+          "kind": "ledger",
+          "verdict": "undetermined"
+        }
+      ],
+      "provenance": {
+        "type": "developer-authored paired control",
+        "related_review": "V035",
+        "related_issues": [
+          "I026",
+          "I027",
+          "I003",
+          "I004"
+        ]
+      },
+      "annotation_reason": "Unchecked status does not establish checking history."
+    },
+    {
+      "id": "unchecked-control",
+      "text": "The supplied ledger records E065 as unchecked.",
+      "context": {
+        "records": {
+          "evidence_status": {
+            "E065": "unchecked"
+          }
+        },
+        "scope": "Stored observations only; no complete activity history or page content is supplied."
+      },
+      "expected": [
+        {
+          "text": "The supplied ledger records E065 as unchecked.",
+          "kind": "ledger",
+          "verdict": "supported"
+        }
+      ],
+      "provenance": {
+        "type": "developer-authored paired control",
+        "related_review": "V035",
+        "related_issues": [
+          "I026",
+          "I027",
+          "I003",
+          "I004"
+        ]
+      },
+      "annotation_reason": "The narrow stored-status assertion is supported."
+    },
+    {
+      "id": "page-absence",
+      "text": "HELM page 1 contains no scenario-level results.",
+      "context": {
+        "records": {
+          "paper_read_pages": {
+            "P001": [
+              1
+            ]
+          }
+        },
+        "scope": "Stored observations only; no complete activity history or page content is supplied."
+      },
+      "expected": [
+        {
+          "text": "HELM page 1 contains no scenario-level results.",
+          "kind": "literature",
+          "verdict": "undetermined"
+        }
+      ],
+      "provenance": {
+        "type": "developer-authored paired control",
+        "related_review": "V035",
+        "related_issues": [
+          "I026",
+          "I027",
+          "I003",
+          "I004"
+        ]
+      },
+      "annotation_reason": "Reading-page membership does not establish page content."
+    },
+    {
+      "id": "page-control",
+      "text": "The supplied ledger lists P001 page 1 as read.",
+      "context": {
+        "records": {
+          "paper_read_pages": {
+            "P001": [
+              1
+            ]
+          }
+        },
+        "scope": "Stored observations only; no complete activity history or page content is supplied."
+      },
+      "expected": [
+        {
+          "text": "The supplied ledger lists P001 page 1 as read.",
+          "kind": "ledger",
+          "verdict": "supported"
+        }
+      ],
+      "provenance": {
+        "type": "developer-authored paired control",
+        "related_review": "V035",
+        "related_issues": [
+          "I026",
+          "I027",
+          "I003",
+          "I004"
+        ]
+      },
+      "annotation_reason": "This is only a statement of recorded reading scope."
+    }
+  ],
+  "revision_note": "Explicitly accept the complete negative sentence for both required propositions: preserving shared exclusivity/negation is valid. No arbitrary paragraph containment is accepted. Prior hashes/results retained."
+}

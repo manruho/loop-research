@@ -2,6 +2,7 @@
 from .schema import obj, array, string
 from .common import ResearchError
 from . import ledger
+from .assertion_spans import SCOPE_PROMPT, scope_loss
 
 TEXT = string(minimum=1)
 INTEGER = {"type": "integer", "minimum": 1, "maximum": 1000}
@@ -18,7 +19,7 @@ VERIFY = obj(
                               status=string(("complete", "no_facts", "incomplete")), reason=TEXT), minimum=1, maximum=110),
     limitations=array(TEXT, minimum=1, maximum=12),
 )
-PROMPT = (
+PROMPT = SCOPE_PROMPT + (
     "Inspect MT001 (title), every MH target (heading), and every MU target (uncertainties); verification_targets enumerates all prose. "
     "source_path resolves inside draft.content; string targets use field=text and qualification is empty. "
     "Preserve the complete proposition, negation, temporal scope and qualifications. A quoted older count "
@@ -43,7 +44,7 @@ PROMPT = (
     "proposals and conditional future evaluations are not factual activity assertions. "
     "COVERAGE CHECKLIST: inspect every block's text AND qualification, particularly metadata-only paper "
     "IDs, evidence_status (including unchecked/disputed), evidence_relation (including unassessed), and "
-    "each individual paper/page and document-to-paper mapping. Split long conjunctions into separate "
+    "each individual paper/page and document-to-paper mapping. Where scope can be preserved, split long conjunctions into separate "
     "G assertions; do not pack an entire ledger paragraph into one claim with eight truncated checks. "
     "Use every relevant P/E/D ID named by the manuscript; a partial mapping cannot be complete coverage. "
     "For each use G001 etc, an exact manuscript substring, and checks against ledger_snapshot.records. "
@@ -131,6 +132,12 @@ def normalize(data, result):
             fact["start"], fact["end"] = locate(manuscript[fact["block_id"]][fact["field"]], fact["text"], fact["occurrence"])
         except ResearchError as exc:
             raise ResearchError(f"{fact['id']} {fact['block_id']}.{fact['field']}: {exc}") from exc
+        fact['scope_check'] = scope_loss(manuscript[fact['block_id']][fact['field']], fact['start'], fact['end'])
+        if fact['scope_check']['omitted_cues']:
+            fact['verdict'] = 'undetermined'
+            fact['host_adjustments'].append('possible omitted negation or scope restriction')
+            fact['reason'] = 'Host scope gate: enclosing sentence has scope cues outside the extracted span. ' + fact['reason']
+            fact['qualification'] = 'Re-extract with shared negation and restrictions preserved; review full sentence. ' + fact['qualification']
         seen = set()
         for source in fact["sources"]:
             eid = source["evidence_id"]

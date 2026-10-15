@@ -73,6 +73,13 @@ def parser():
     extraction.add_argument("--model", required=True)
     extraction.add_argument("--cases", default="benchmarks/extraction-cases.json")
     extraction.add_argument("--timeout", type=float, default=300)
+    regression = actions.add_parser("verification-regression")
+    regression.add_argument("--output", required=True)
+    source = regression.add_mutually_exclusive_group(required=True)
+    source.add_argument("--model")
+    source.add_argument("--result")
+    regression.add_argument("--cases", default="benchmarks/verification-cases.json")
+    regression.add_argument("--timeout", type=float, default=300)
     evaluate = actions.add_parser("run")
     evaluate.add_argument("--output", required=True)
     evaluate.add_argument("--cases", default="benchmarks/position-papers.json")
@@ -422,6 +429,9 @@ def main(argv=None):
             if args.action == "extraction":
                 from .extraction_eval import run
                 result = run(args.output, args.model, args.cases, args.timeout)
+            elif args.action == 'verification-regression':
+                from .verification_eval import run
+                result = run(args.output, args.model, args.cases, args.timeout, args.result)
             elif args.action == 'selection':
                 from .retrieval_eval import run
                 result = run(args.output, args.cases, args.model, args.ranking, args.k, args.timeout)

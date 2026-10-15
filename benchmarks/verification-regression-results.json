@@ -1,0 +1,139 @@
+{
+  "notice": "Developer annotations on selected diagnostic excerpts and paired controls; not independent human ground truth, full-manuscript recall, or superiority evidence.",
+  "requested_model": "gpt-6-sol",
+  "model_calls": 1,
+  "evaluation": "Fixed selected spans; terminal period ignored; no claim of full-manuscript recall.",
+  "manifest": {
+    "requested_model": null,
+    "cases_sha256": "6bfb816f19fc31b9e95a8b5eaa7b198aac5aa77479076fcf7fd9efe29a33607b",
+    "evaluator_sha256": "cd91553e681cf0e8de0d4ea4e38ed7bd1a55b1053e968fb96f5d598608916a33",
+    "prompt_sha256": "ab6de024f8b5771cab06d280e563c2ae26dcc3d0772d327003e0f84ee011e094",
+    "status": "completed",
+    "mode": "saved-result",
+    "notice": "Developer annotations on selected diagnostic excerpts and paired controls; not independent human ground truth, full-manuscript recall, or superiority evidence.",
+    "result_sha256": "8b7e4949d70325a6f3b8d6f50a962b44d0788348da69f2430822a9bde8522096"
+  },
+  "required": 9,
+  "extracted": 8,
+  "correct": 8,
+  "case_results": [
+    {
+      "id": "comparison-omission",
+      "checks": [
+        {
+          "text": "These are substantial precedents for contextual documentation and qualified reliance.",
+          "kind": "comparison",
+          "verdict": "undetermined",
+          "extracted": true,
+          "correct": true
+        }
+      ]
+    },
+    {
+      "id": "activity-exclusivity",
+      "checks": [
+        {
+          "text": "This response used only supplied material",
+          "kind": "ledger",
+          "verdict": "undetermined",
+          "extracted": true,
+          "correct": true
+        },
+        {
+          "text": "no tools, new searches, full-paper reading, or independent source verification.",
+          "kind": "ledger",
+          "verdict": "undetermined",
+          "extracted": false,
+          "correct": false
+        }
+      ]
+    },
+    {
+      "id": "presentation-control",
+      "checks": [
+        {
+          "text": "The supplied ledger records raw_search_responses_supplied as false.",
+          "kind": "ledger",
+          "verdict": "supported",
+          "extracted": true,
+          "correct": true
+        }
+      ]
+    },
+    {
+      "id": "tool-count-control",
+      "checks": [
+        {
+          "text": "The supplied ledger records author_tool_call_count as zero.",
+          "kind": "ledger",
+          "verdict": "supported",
+          "extracted": true,
+          "correct": true
+        }
+      ]
+    },
+    {
+      "id": "unchecked-absence",
+      "checks": [
+        {
+          "text": "No human checked E065.",
+          "kind": "ledger",
+          "verdict": "undetermined",
+          "extracted": true,
+          "correct": true
+        }
+      ]
+    },
+    {
+      "id": "unchecked-control",
+      "checks": [
+        {
+          "text": "The supplied ledger records E065 as unchecked.",
+          "kind": "ledger",
+          "verdict": "supported",
+          "extracted": true,
+          "correct": true
+        }
+      ]
+    },
+    {
+      "id": "page-absence",
+      "checks": [
+        {
+          "text": "HELM page 1 contains no scenario-level results.",
+          "kind": "literature",
+          "verdict": "undetermined",
+          "extracted": true,
+          "correct": true
+        }
+      ]
+    },
+    {
+      "id": "page-control",
+      "checks": [
+        {
+          "text": "The supplied ledger lists P001 page 1 as read.",
+          "kind": "ledger",
+          "verdict": "supported",
+          "extracted": true,
+          "correct": true
+        }
+      ]
+    }
+  ],
+  "attempts": [
+    {
+      "mode": "initial exact punctuation scoring",
+      "required": 9,
+      "extracted": 1,
+      "correct": 1
+    },
+    {
+      "mode": "same saved model output rescored ignoring terminal periods",
+      "required": 9,
+      "extracted": 8,
+      "correct": 8
+    }
+  ],
+  "remaining_failure": "Negative activity conjunction was split into spans missing shared negation. Some reasons recognized the uncertainty, so the score is not a direct measure of semantic judgment accuracy alone."
+}

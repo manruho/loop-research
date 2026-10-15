@@ -1,0 +1,236 @@
+{
+  "notice": "Developer annotations on selected diagnostic excerpts and paired controls; not independent human ground truth, full-manuscript recall, or superiority evidence.",
+  "requested_model": "gpt-6-sol",
+  "model_calls": 1,
+  "prior_result": "verification-regression-results.json",
+  "before_scoring_revision": {
+    "required": 9,
+    "extracted": 7,
+    "correct": 7
+  },
+  "after_explicit_sentence_alternative": {
+    "required": 9,
+    "extracted": 9,
+    "correct": 9
+  },
+  "scoring_change": "Case version 2 explicitly permits the complete negative activity sentence for both component targets; same saved response rescored, no new model call. Arbitrary paragraph containment is still rejected.",
+  "manifest": {
+    "requested_model": null,
+    "cases_sha256": "938aa02b9a92289b90ddd09ceb320fec89d858530cf25dc68de2a9ae6e2977fa",
+    "evaluator_sha256": "11949f5f6cf150db1509860babdc41aaa54db3daa01b71dbdca559c5b7f4999d",
+    "prompt_sha256": "651a6bc5b168353f754c9d3cf92c1efdbf51bee8f561443c7da51335a209745b",
+    "status": "completed",
+    "mode": "saved-result",
+    "notice": "Developer annotations on selected diagnostic excerpts and paired controls; not independent human ground truth, full-manuscript recall, or superiority evidence.",
+    "result_sha256": "f4ffa8bc86be2b010100afc4f91d0665df9cfdf81f4a7ce33fbbe4b2b3eaf59c"
+  },
+  "case_results": [
+    {
+      "id": "comparison-omission",
+      "checks": [
+        {
+          "text": "These are substantial precedents for contextual documentation and qualified reliance.",
+          "kind": "comparison",
+          "verdict": "undetermined",
+          "extracted": true,
+          "correct": true
+        }
+      ],
+      "unscored_assertions": [
+        {
+          "text": "HELM’s abstract frames evaluation around transparency",
+          "kind": "literature",
+          "verdict": "undetermined",
+          "reason": "提供されたのは原稿の要約のみで、原文はない。"
+        },
+        {
+          "text": "reports multiple metrics across scenarios",
+          "kind": "literature",
+          "verdict": "undetermined",
+          "reason": "提供されたのは原稿の要約のみで、指標やシナリオを確認できる原文はない。"
+        },
+        {
+          "text": "acknowledges incomplete coverage.",
+          "kind": "literature",
+          "verdict": "undetermined",
+          "reason": "提供されたのは原稿の要約のみで、原文はない。"
+        },
+        {
+          "text": "Model Cards proposes documentation combining evaluation conditions, intended-use context, and evaluation procedures.",
+          "kind": "literature",
+          "verdict": "undetermined",
+          "reason": "評価条件、用途の文脈、評価手順のいずれについても、確認できる原文は提供されていない。"
+        },
+        {
+          "text": "Its example smile-detector card excludes emotion inference because the labels concern appearance rather than underlying emotion.",
+          "kind": "literature",
+          "verdict": "undetermined",
+          "reason": "除外の有無と、その理由を確認できる原文は提供されていない。"
+        },
+        {
+          "text": "BenchRisk explicitly aims to help users identify when to avoid relying on a benchmark.",
+          "kind": "literature",
+          "verdict": "undetermined",
+          "reason": "目的の記述を確認できる原文は提供されていない。"
+        }
+      ]
+    },
+    {
+      "id": "activity-exclusivity",
+      "checks": [
+        {
+          "text": "This response used only supplied material",
+          "kind": "ledger",
+          "verdict": "undetermined",
+          "accepted_spans": [
+            "This response used only supplied material, with no tools, new searches, full-paper reading, or independent source verification."
+          ],
+          "extracted": true,
+          "correct": true
+        },
+        {
+          "text": "no tools, new searches, full-paper reading, or independent source verification.",
+          "kind": "ledger",
+          "verdict": "undetermined",
+          "accepted_spans": [
+            "This response used only supplied material, with no tools, new searches, full-paper reading, or independent source verification."
+          ],
+          "extracted": true,
+          "correct": true
+        }
+      ],
+      "unscored_assertions": []
+    },
+    {
+      "id": "presentation-control",
+      "checks": [
+        {
+          "text": "The supplied ledger records raw_search_responses_supplied as false.",
+          "kind": "ledger",
+          "verdict": "supported",
+          "extracted": true,
+          "correct": true
+        }
+      ],
+      "unscored_assertions": []
+    },
+    {
+      "id": "tool-count-control",
+      "checks": [
+        {
+          "text": "The supplied ledger records author_tool_call_count as zero.",
+          "kind": "ledger",
+          "verdict": "supported",
+          "extracted": true,
+          "correct": true
+        }
+      ],
+      "unscored_assertions": []
+    },
+    {
+      "id": "unchecked-absence",
+      "checks": [
+        {
+          "text": "No human checked E065.",
+          "kind": "ledger",
+          "verdict": "undetermined",
+          "extracted": true,
+          "correct": true
+        }
+      ],
+      "unscored_assertions": []
+    },
+    {
+      "id": "unchecked-control",
+      "checks": [
+        {
+          "text": "The supplied ledger records E065 as unchecked.",
+          "kind": "ledger",
+          "verdict": "supported",
+          "extracted": true,
+          "correct": true
+        }
+      ],
+      "unscored_assertions": []
+    },
+    {
+      "id": "page-absence",
+      "checks": [
+        {
+          "text": "HELM page 1 contains no scenario-level results.",
+          "kind": "literature",
+          "verdict": "undetermined",
+          "extracted": true,
+          "correct": true
+        }
+      ],
+      "unscored_assertions": []
+    },
+    {
+      "id": "page-control",
+      "checks": [
+        {
+          "text": "The supplied ledger lists P001 page 1 as read.",
+          "kind": "ledger",
+          "verdict": "supported",
+          "extracted": true,
+          "correct": true
+        }
+      ],
+      "unscored_assertions": []
+    }
+  ],
+  "production_prompt_version": 14,
+  "limitations": [
+    "Single developmental trial, no causal improvement estimate.",
+    "Fixed-case prompt shares scope instructions with production, but this is not full-manuscript verification.",
+    "Back-end identity unconfirmed; annotations not independently human validated."
+  ],
+  "manuscript_trial": {
+    "status": "failed",
+    "source_task_id": 37,
+    "source_db_sha256": "e19f74599b53b542c5a24bc6f36558a1a32abfcb59bd0a996029390a93ded917",
+    "requested_model": "gpt-6-sol",
+    "scope": "Fresh verification of saved A033 input, no study state applied; no independent review or human assessment.",
+    "error": "未支持の事実主張には留保と不足内容が必要です。",
+    "source_db_unchanged": true,
+    "notice": "Fresh output rejected for an unsupported literature assertion missing qualification; not accepted verification. All outputs retained privately. No gate relaxed."
+  },
+  "historical_replay": {
+    "source": "A033/U034 task 37 stored result; no new model inference",
+    "previous_blocking": 2,
+    "current_blocking": 10,
+    "scope_warnings": 8,
+    "previously_passing_activity_claims": [
+      {
+        "id": "G014",
+        "verdict": "undetermined"
+      },
+      {
+        "id": "G015",
+        "verdict": "undetermined"
+      },
+      {
+        "id": "G016",
+        "verdict": "undetermined"
+      },
+      {
+        "id": "G017",
+        "verdict": "undetermined"
+      },
+      {
+        "id": "G018",
+        "verdict": "undetermined"
+      }
+    ],
+    "normalized_sha256": "a29a46de9d41db3094c6a09eb835b73e7cfff85d482d5a8f90a27b836b41ddb0",
+    "notice": "Replay of identical historical data under new host checks; not fresh independent review."
+  },
+  "software_validation": {
+    "command": "python3 -m unittest discover -s tests -t .",
+    "tests": 140,
+    "result": "passed",
+    "focused_final_tests": 22,
+    "notice": "Software behavior checks, not research quality validation."
+  }
+}
