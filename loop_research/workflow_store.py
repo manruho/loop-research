@@ -15,7 +15,7 @@ PREFIX_KINDS = {value: key for key, value in ARTIFACT_PREFIXES.items()}
 DEFAULT_SETTINGS = {"provider": "arxiv", "paper_limit": 12, "pages_per_document": 2,
                     "query_limit": 6, "search_budget": 12, "model": None, "timeout": 180, "reasoning_effort": "medium", "review_model": None, "review_effort": "low",
                     "citation_seeds": 3, "citation_limit": 10, "citation_budget": 30,
-                    "draft_checkpoint_readings": 2, "semantic_selection": 1, 'selection_page_limit': 16}
+                    "draft_checkpoint_readings": 2, "semantic_selection": 1, 'selection_page_limit': 16, 'structured_snippets': 1}
 OWNER_SCHEMA = """
 ALTER TABLE searches ADD COLUMN owner_pid INTEGER;
 ALTER TABLE searches ADD COLUMN owner_identity TEXT;
@@ -126,7 +126,7 @@ class WorkflowStore:
             for key, maximum in (("paper_limit", 20), ("pages_per_document", 20), ("query_limit", 10), ("search_budget", 100), ("citation_seeds", 10), ("citation_limit", 20), ("citation_budget", 100)):
                 if type(merged[key]) is not int or not (0 if key.startswith("citation_") else 1) <= merged[key] <= maximum:
                     raise ResearchError(f"{key}が有効な範囲にありません。")
-            for key, maximum in (("draft_checkpoint_readings", 20), ("semantic_selection", 1)):
+            for key, maximum in (("draft_checkpoint_readings", 20), ("semantic_selection", 1), ("structured_snippets", 1)):
                 if type(merged[key]) is not int or not 0 <= merged[key] <= maximum:
                     raise ResearchError(f"{key}が有効な範囲にありません。")
             if type(merged['selection_page_limit']) is not int or not 1 <= merged['selection_page_limit'] <= 60:

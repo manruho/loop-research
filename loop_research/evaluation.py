@@ -21,7 +21,7 @@ FACT_EXTRACTION = obj(facts=array(string(minimum=1, maximum=1800), maximum=150),
                       limitations=array(string(minimum=1), minimum=1, maximum=12))
 RUBRIC = ("prior_work", "argument", "counterarguments", "qualification", "traceability")
 VARIANTS = {'harness': {}, 'harness-no-checkpoint': {'draft_checkpoint_readings': 0},
-            'harness-lexical': {'semantic_selection': 0}, 'harness-no-citations': {'citation_seeds': 0}}
+            'harness-lexical': {'semantic_selection': 0}, 'harness-edge-snippets': {'structured_snippets': 0}, 'harness-no-citations': {'citation_seeds': 0}}
 
 
 def read(path):

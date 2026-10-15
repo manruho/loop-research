@@ -61,3 +61,19 @@ CLI使用量の欠測数を示す。中断中で終了時刻がない時間を�
 人間評価後の `human_fact_support_by_method` は `not_factual` を除く全対象と、
 `undetermined` をさらに除く判定可能対象を分けて支持割合を示す。未評価なら割合はnull。
 これはサンプル内の人間判定で、抽出再現率や本番AI検証器の精度ではない。
+
+## 選別抜粋の固定入力診断と除去実験
+
+```bash
+python3 -m loop_research eval snippets --output .research/snippets-new
+```
+
+モデル呼び出しなしで、`benchmarks/snippet-cases.json` の同じ人工資料・上限に対する
+旧冒頭/末尾方式と新方式の対象抜粋提示数・文字数を比較する。
+実研究の選別判断、文献探索再現率、論文品質とは別の診断である。
+出力はケース原本、ケースSHA、実装SHAと集計を含め、既存出力は上書きしない。
+
+実研究の除去実験には `eval run --methods baseline harness harness-edge-snippets` を使える。
+`harness-edge-snippets` は `structured_snippets=0` だけを変え、検証・査読条件は変えない。
+従来の探索・早期草稿・意味的選別・引用探索の除去方式も維持する。
+今回、大規模な実モデル比較は実行していない。

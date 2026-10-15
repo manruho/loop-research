@@ -48,6 +48,20 @@ class ResearchImprovements(unittest.TestCase):
         self.store.db.commit()
         self.assertIsNone(w.cached_selection())
 
+    def test_structured_snippet_ablation_changes_cache_without_reading(self):
+        fake_search(self.store, 'synthetic workload', 'arxiv', 1)
+        text = 'Background. ' * 150 + '\nLimitations\nNo significant effect.\n' + 'Background. ' * 150
+        self.store.save_document(None, 'P001', text.encode(), 'text', 'https://fixture.invalid/a', [text], 'synthetic')
+        w = ResearchWorkflow(self.store, FixtureEngine())
+        with contextlib.redirect_stderr(io.StringIO()): w.perform('selection', document='D001')
+        self.assertIsNotNone(w.cached_selection('D001'))
+        payload = w.data_for('selection', document='D001')
+        self.assertIn('snippet_spans', payload['candidates'][0])
+        self.assertEqual(self.store.list_artifacts('reading'), [])
+        self.store.configure_study('Ablate snippets', settings={'structured_snippets': 0})
+        self.assertIsNone(w.cached_selection('D001'))
+        self.assertNotIn('No significant effect.', w.data_for('selection', document='D001')['candidates'][0]['snippet'])
+
     def test_selection_rejects_missing_duplicate_unknown_ids_and_keeps_counterwork(self):
         data = {'candidates': [{'id': 'P001'}, {'id': 'P002'}, {'id': 'P003'}]}
         raw = {'judgments': [{'candidate_id': cid, 'relevance': kind, 'reason': 'Synthetic'}
