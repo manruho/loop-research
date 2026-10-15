@@ -14,6 +14,10 @@ def allocation(kind, total, remaining, timeout):
             'timeout_seconds': max(0, min(timeout, remaining - reserve))}
 
 
+WORKING_DRAFT_WORDS = (600, 900)
+WORKING_DRAFT_LENGTH = f'{WORKING_DRAFT_WORDS[0]}-{WORKING_DRAFT_WORDS[1]}'
+
+
 COMPACT = {
     'orientation': 'Aim for 120 words of analysis plus 3-4 complementary queries, including counterevidence.',
     'selection': 'Keep each reason to about 10 English words; judge EVERY supplied candidate. Preserve uncertain and counterevidence classifications.',
@@ -21,7 +25,7 @@ COMPACT = {
     'exploration': 'Explore two genuinely competing positions, aiming for 250-350 words TOTAL. Use one short sentence per scalar explanation and 1-2 items per notes list; preserve value premises, strongest objections, and bounded novelty.',
     'comparison': 'Assess EVERY supplied candidate, aiming for 150-250 words TOTAL with short explanations and 1-2 unresolved items. Do not change the criteria for proceeding, holding or withdrawing.',
     'outline': 'Aim for 180-250 words TOTAL across three concise sections, each with 1-2 premises, the strongest relevant objection and limits. This is an argument plan; do not prewrite the manuscript or repeat the same argument in each field.',
-    'draft': 'Override only the earlier length target: aim for a 600-900 word provisional working draft with all seven required section roles, usually one short block per section. Preserve fair prior work, value premises, strongest objections and limitations. Include only warranted factual assertions; expose evidence gaps rather than hiding them or claiming success.',
+    'draft': f'Override only the earlier length target: aim for a {WORKING_DRAFT_LENGTH} word provisional working draft with all seven required section roles, usually one short block per section. Preserve fair prior work, value premises, strongest objections and limitations. Include only warranted factual assertions; expose evidence gaps rather than hiding them or claiming success.',
     'revise_draft': 'Keep the working draft concise while addressing EVERY supplied blocking issue. Retain all required section roles, counterarguments and qualifications.',
     'redesign': 'Use concise explanations and respond to EVERY supplied blocking issue. Preserve hold, withdrawal and further-research options.',
 }

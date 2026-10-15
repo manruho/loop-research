@@ -14,6 +14,8 @@ from .common import ResearchError, now
 from .codex import codex_status, subscription_environment, stop_process
 from .engine import CodexEngine, diagnostic, guard_parent
 from .schema import obj, array, string, validate
+from .budget import WORKING_DRAFT_WORDS, WORKING_DRAFT_LENGTH
+from collections import Counter
 
 FACT_EXTRACTION = obj(facts=array(string(minimum=1, maximum=1800), maximum=150),
                       limitations=array(string(minimum=1), minimum=1, maximum=12))
@@ -57,12 +59,19 @@ def load_cases(path):
     return spec
 
 
+def manuscript_available(root):
+    """Retain saved partial drafts from failed/interrupted attempts for human grading."""
+    draft = Path(root) / 'draft.md'
+    return draft.exists() and bool(draft.read_text().strip()) and not draft.read_text().lstrip().startswith('NO_PAPER:')
+
+
 def baseline(case, root, model, seconds):
+    start = time.monotonic()
     auth = codex_status()
     if not auth["chatgpt_authenticated"]:
         raise ResearchError(auth["message"])
     seed = case["seed"]
-    prompt = ("Research this position-paper question and write an English working manuscript of 1200-2000 words, "
+    prompt = (f"Research this position-paper question and write an English working manuscript of {WORKING_DRAFT_LENGTH} words, "
               "with verifiable references, strongest counterarguments, limits, search/reading scope and uncertainties. "
               "Distinguish normative premises from empirical findings. You may hold or withdraw instead of forcing a paper. "
               "Use public literature and do not invent citations. Search and read as needed.\nQUESTION: " + case["question"]
@@ -75,13 +84,15 @@ def baseline(case, root, model, seconds):
                "-c", 'model_reasoning_effort="medium"', "-c", "features.unbounded_connection_retries=false",
                "-c", "features.multi_agent=false", "-c", "features.apps=false", "-c", "features.plugins=false",
                "--output-last-message", str((root / "draft.md").resolve()), "-"]
-    start = time.monotonic()
+    remaining = seconds - (time.monotonic() - start)
+    if remaining <= 0:
+        raise subprocess.TimeoutExpired(command, seconds)
     parent = os.getpid()
     proc = subprocess.Popen(command, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
                             text=True, cwd=root, env=subscription_environment(), start_new_session=True,
                             preexec_fn=(lambda: guard_parent(parent)) if __import__('sys').platform.startswith('linux') else None)
     try:
-        stdout, stderr = proc.communicate(prompt, timeout=seconds)
+        stdout, stderr = proc.communicate(prompt, timeout=max(.001, seconds - (time.monotonic() - start)))
     except (subprocess.TimeoutExpired, KeyboardInterrupt):
         stop_process(proc)
         raise
@@ -97,11 +108,13 @@ def baseline(case, root, model, seconds):
     usages = [e.get("usage") for e in events if e.get("type") == "turn.completed"]
     completed = proc.returncode == 0 and bool(usages) and not any(e.get("type") in ("turn.failed", "error") for e in events)
     draft_file = root / "draft.md"
-    has_manuscript = draft_file.exists() and not draft_file.read_text().lstrip().startswith("NO_PAPER:")
-    no_paper = completed and not has_manuscript
-    if no_paper and draft_file.exists():
+    has_manuscript = manuscript_available(root)
+    final_text = draft_file.read_text().lstrip() if draft_file.exists() else ''
+    no_paper = completed and final_text.startswith(('NO_PAPER: hold', 'NO_PAPER: withdraw'))
+    if no_paper:
         draft_file.rename(root / "no-paper.txt")
-    return {"status": "held" if no_paper else "completed" if completed else "failed", "manuscript_available": completed and has_manuscript, "elapsed_seconds": time.monotonic()-start,
+    status = ('withdrawn' if final_text.startswith('NO_PAPER: withdraw') else 'held') if no_paper else ('completed' if completed and has_manuscript else 'failed')
+    return {"status": status, "manuscript_available": has_manuscript, "elapsed_seconds": time.monotonic()-start,
             "usage": usages, "tool_calls": sum(e.get("type") == "item.completed" and e.get("item", {}).get("type") in ("web_search", "command_execution") for e in events),
             "cli_version": auth.get("version"), "requested_model": model,
             "diagnostic": diagnostic(stderr) if not completed else None,
@@ -113,31 +126,57 @@ def harness(case, root, model, review_model, seconds, overrides=None):
     from .literature import register_paper
     from .workflow import ResearchWorkflow
     from .export import export_study
-    store = ResearchStore(root / "study.sqlite3", initialize=True)
     start = time.monotonic()
+    store = ResearchStore(root / "study.sqlite3", initialize=True)
     try:
         store.init(case["question"])
         settings = {"model": model, "review_model": review_model, "timeout": 240}
         settings.update(overrides or {})
         store.configure_study("Predeclared pilot models and ablation", settings=settings)
         register_paper(store, title=case["seed"]["title"], arxiv=case["seed"]["arxiv"])
-        result = ResearchWorkflow(store).run(200, max_seconds=seconds)
-        exported = export_study(store, root / "export")
+        remaining = seconds - (time.monotonic() - start)
+        if remaining <= 0:
+            store.control_study('budget_exhausted', 'Evaluation setup consumed the run budget; no model started.')
+            result = ResearchWorkflow(store).summary()
+        else:
+            result = ResearchWorkflow(store).run(200, max_seconds=remaining)
+        export_study(store, root / "export")
         if result["current_draft"]:
             (root / "draft.md").write_text((root / "export" / "draft.md").read_text())
         else:
             (root / "no-paper.txt").write_text(result["state"]["reason"])
         tasks = [store.show_task(t["id"]) for t in store.list_tasks()]
         return {"status": result["state"]["status"], "elapsed_seconds": time.monotonic()-start,
-                'phase_metrics': phase_metrics(store), 'settings': store.study_state()['settings'],
+                'phase_metrics': phase_metrics_from_tasks(tasks), 'settings': store.study_state()['settings'],
                 "usage": [t["execution"].get("usage") for t in tasks if t["execution"]],
                 "task_count": len(tasks), "papers": len(store.list_papers()),
                 "searches": len(store.list_searches()), "reading_scope": result["scope"],
                 "current_draft": result["current_draft"], "reason": result["state"]["reason"],
                 "requested_model": model, "requested_review_model": review_model,
                 "scope": "Host discovery and bounded Codex roles; not tool-identical to baseline"}
+    except (Exception, KeyboardInterrupt):
+        preserve_manuscript(store, root)
+        raise
     finally:
         store.close()
+
+
+def preserve_manuscript(store, root):
+    """Expose an accepted draft after failure without changing its research status."""
+    try:
+        artifact = store.latest_artifact('draft')
+        if artifact and not manuscript_available(root):
+            from .export import render_draft
+            text = render_draft(store, artifact, store.study_state()['status'], current=False)
+            (root / 'draft.md').write_text(text)
+            save(root / 'manuscript-provenance.json', {
+                'artifact_id': artifact['id'], 'current': False,
+                'scope': 'Latest accepted draft preserved after a failed/interrupted evaluation attempt',
+                'sha256': hashlib.sha256(text.encode()).hexdigest()})
+    except Exception as capture_error:
+        # Even a full disk during capture must not replace the original failure.
+        with contextlib.suppress(OSError):
+            save(root / 'manuscript-capture-error.json', {'reason': diagnostic(str(capture_error))})
 
 
 def run_evaluation(output, cases_path, model, review_model, seconds=1800, resume=False, methods=None):
@@ -163,13 +202,22 @@ def run_evaluation(output, cases_path, model, review_model, seconds=1800, resume
         manifest = read(manifest_path) if manifest_path.exists() else {
             "created_at": now(), "cases": spec, "cases_sha256": spec_hash, "model": model, "review_model": review_model,
             "seconds_per_run": seconds, "runs": [], "human_evaluation": "pending",
-            'methods': methods, 'source_sha256': source_hashes,
+            'methods': methods, 'source_sha256': source_hashes, 'evaluation_contract': 2,
+            'conditions': {'requested_writer_model': model, 'writer_effort': 'medium',
+                           'requested_reviewer_model': review_model, 'review_effort': 'low',
+                           'seconds_per_run': seconds, 'budget_scope': 'Method setup and research; elapsed_seconds also includes export/overhead, not a hard process deadline', 'manuscript_words': list(WORKING_DRAFT_WORDS),
+                           'language': 'English', 'seed_policy': 'Same title and arXiv identifier, not identical acquired bytes; unversioned IDs may resolve differently',
+                           'method_order': 'Rotate declared method order by case index',
+                           'backend_identity': 'unconfirmed unless CLI execution metadata confirms it',
+                           'remaining_confounds': ['Different search tools, aggregate calls and tokens',
+                                                   'Harness alone has internal verification/review',
+                                                   'Live literature can change; one run per method']},
             "limitations": [f"{len(spec['cases'])} cases, 1 run per method; no statistical or general superiority claim.",
                              "Different tools and aggregate model usage; model diversity is a confound.",
                              "Reference-set membership and AI extraction are not human ground truth."]}
         if (manifest["model"], manifest["review_model"], manifest["cases_sha256"], manifest["seconds_per_run"]) != (model, review_model, spec_hash, seconds):
             raise ResearchError("再開のモデル・課題・予算が評価開始時と違います。")
-        if manifest.get('methods', ['baseline', 'harness']) != methods or manifest.get('source_sha256', source_hashes) != source_hashes:
+        if manifest.get('evaluation_contract') != 2 or manifest.get('methods', ['baseline', 'harness']) != methods or manifest.get('source_sha256', source_hashes) != source_hashes:
             raise ResearchError('再開の方式または実装が評価開始時と違います。別の出力先で比較してください。')
         save(manifest_path, manifest)
         for case in spec["cases"]:
@@ -192,6 +240,7 @@ def run_evaluation(output, cases_path, model, review_model, seconds=1800, resume
                             ResearchWorkflow(store).recover()
                             if store.study_state()["status"] == "active":
                                 store.control_study("interrupted", "評価制御プロセスの中断。結果は再実行せず保持。")
+                            preserve_manuscript(store, destination)
                         finally:
                             store.close()
                     # An interrupted attempt is evidence, not permission to silently re-run.
@@ -214,6 +263,7 @@ def run_evaluation(output, cases_path, model, review_model, seconds=1800, resume
                 except (ResearchError, OSError, subprocess.TimeoutExpired) as exc:
                     result = {"status": "timed_out" if isinstance(exc, subprocess.TimeoutExpired) else "failed",
                               "reason": diagnostic(str(exc)) or type(exc).__name__, "elapsed_seconds": time.monotonic()-started}
+                result['elapsed_seconds'] = time.monotonic() - started
                 manifest["runs"].append(dict(result, case_id=case["id"], method=method, path=destination.name, source_sha256=source_hashes))
                 save(manifest_path, manifest)
                 print(case["id"] + " " + method + " " + result["status"], flush=True)
@@ -224,7 +274,7 @@ def anonymize(text, record_ids=()):
     text = re.sub(r"<!--.*?-->", "", text, flags=re.S)
     for record_id in sorted(set(record_ids), key=len, reverse=True):
         text = re.sub(r"\b" + re.escape(record_id) + r"\b", "[record]", text)
-    text = re.sub(r"^>.*(?:historical|withdrawn|ready_for_human|finalized).*\n", "", text, flags=re.M|re.I)
+    text = re.sub(r"^>.*(?:Research status:|historical|withdrawn|ready_for_human|finalized).*\n", "", text, flags=re.M|re.I)
     return text.strip() + "\n"
 
 
@@ -248,7 +298,7 @@ def packet(output, reviewer_model):
             mapping[code] = {"case_id": run["case_id"], "method": run["method"]}
             case = next(c for c in manifest["cases"]["cases"] if c["id"] == run["case_id"])
             draft = root / run["path"] / "draft.md"
-            successful = draft.exists() and run["status"] not in ("failed", "timed_out", "interrupted")
+            successful = manuscript_available(root / run["path"])
             record_ids = set()
             if run["method"] in VARIANTS:
                 def collect(value):
@@ -269,7 +319,7 @@ def packet(output, reviewer_model):
             if successful:
                 extracted, execution = CodexEngine(reviewer_model, 240, "low").execute(
                     "evaluation-extraction", {"manuscript": text},
-                    "Extract every empirically checkable assertion, including mixed/normative paragraphs, as an exact contiguous substring. Preserve negation, population and numbers. Exclude explicit conjectures, normative premises and analytic/logical arguments that are not empirical claims. No grading, paraphrase or support verdict. Report omissions and uncertainty.", FACT_EXTRACTION)
+                    "Extract every empirically checkable assertion, including mixed/normative paragraphs, as an exact contiguous substring. Preserve negation, population and numbers. If splitting loses shared negation or conditions, retain the complete compound sentence rather than positive fragments. Exclude explicit conjectures, normative premises and analytic/logical arguments that are not empirical claims. No grading, paraphrase or support verdict. Report omissions and uncertainty.", FACT_EXTRACTION)
                 validate(extracted, FACT_EXTRACTION)
                 facts = list(dict.fromkeys(extracted["facts"]))
                 if any(f not in text for f in facts):
@@ -279,11 +329,12 @@ def packet(output, reviewer_model):
                 if len(facts) > 20:
                     facts = random.Random(108).sample(facts, 20)
             samples.append({"sample_id": code, "manuscript_available": successful,
+                            "manuscript_scope": "Saved text, potentially incomplete or historical; availability is not acceptance or successful completion.",
                             "scores": {k: None for k in RUBRIC}, "comments": "",
                             "facts": [{"id": f"Fact-{i+1:02d}", "text": f, "verdict": None, "source_locator": "", "reason": ""} for i, f in enumerate(facts)],
                             "extraction_limitations": limitation, "omitted_factual_assertions": "",
                             "source_access_problems": "", "reference_set_relevance": ""})
-        save(stage / "scores.json", {"samples": samples})
+        save(stage / "scores.json", {"evaluator": {"id": "", "relationship_to_project": "unknown", "assistance": ""}, "samples": samples})
         save(root / "private-score-template.json", {"samples": samples})
         (stage / "README.md").write_text("# Human evaluation\n\nScore prior_work, argument, counterarguments, qualification, traceability on 1–5 (1 poor, 3 mixed, 5 strong). Explain judgments. Leave unavailable manuscripts null.\n\nFor each fact choose supported, partial, contradicted, undetermined, or not_factual; record a primary-source page/section and reason. Check negation, numbers, scope, causal inference and extraction omissions. AI extraction is not ground truth. Source inaccessibility means undetermined, not contradicted.\n\nMethod identity is withheld, but formatting/content can still reveal it; blinding is imperfect. Return scores.json. Source links are in the manuscripts.\n")
         save(root / "private-sample-map.json", mapping)
@@ -309,7 +360,9 @@ def score_template(root):
         run = next((r for r in manifest["runs"] if (r["case_id"], r["method"]) == (identity["case_id"], identity["method"])), None)
         if run is None:
             raise ResearchError("評価票の原本を再構築できません。実行記録が欠けています。")
-        successful = (root / run["path"] / "draft.md").exists() and run["status"] not in ("failed", "timed_out", "interrupted")
+        successful = manuscript_available(root / run["path"])
+        if manifest.get('evaluation_contract', 1) < 2:
+            successful = successful and run['status'] not in ('failed', 'timed_out', 'interrupted')
         facts = []
         if successful:
             extracted = read(root / (code + "-extraction.json"))["result"]
@@ -329,6 +382,11 @@ def import_scores(output, path):
     mapping = read(root / "private-sample-map.json")
     if not isinstance(submitted, dict) or not isinstance(submitted.get("samples"), list):
         raise ResearchError("評価票の形式が不正です。")
+    evaluator = submitted.get('evaluator', {'id': '', 'relationship_to_project': 'unknown', 'assistance': ''})
+    if (not isinstance(evaluator, dict) or set(evaluator) != {'id', 'relationship_to_project', 'assistance'}
+            or not all(isinstance(value, str) for value in evaluator.values())
+            or evaluator['relationship_to_project'] not in ('independent', 'contributor', 'author', 'unknown')):
+        raise ResearchError('評価者の属性はid・relationship_to_project・assistanceで指定してください。')
     samples = submitted["samples"]
     if any(not isinstance(s, dict) or not isinstance(s.get("scores"), dict) or not isinstance(s.get("facts"), list)
            or any(not isinstance(f, dict) or not all(isinstance(f.get(k), str) for k in ("id", "text", "source_locator", "reason")) for f in s["facts"]) for s in samples):
@@ -355,7 +413,7 @@ def import_scores(output, path):
     dest = root / ("human-scores-" + hashlib.sha256(Path(path).read_bytes()).hexdigest()[:12] + ".json")
     if dest.exists():
         raise ResearchError("この評価はすでに取り込み済みです。")
-    save(dest, {"submitted_at": now(), "input_sha256": hashlib.sha256(Path(path).read_bytes()).hexdigest(), "samples": samples})
+    save(dest, {"submitted_at": now(), "input_sha256": hashlib.sha256(Path(path).read_bytes()).hexdigest(), "evaluator": evaluator, "independence_scope": "Self-declared, not independently verified", "samples": samples})
     manifest = read(root / "manifest.json")
     manifest.update(human_evaluation="completed", human_scores=dest.name)
     save(root / "manifest.json", manifest)
@@ -379,34 +437,75 @@ def identifiers(text):
 
 
 def phase_metrics(store):
-    """Observed wall time and CLI-reported usage, including failed calls."""
+    """Read each task once; failures and missing durations remain visible."""
+    return phase_metrics_from_tasks([store.show_task(t['id']) for t in store.list_tasks()])
+
+
+def phase_metrics_from_tasks(tasks):
     from datetime import datetime
-    phases, first, first_calls = {}, None, None
-    starts = []
-    for index, entry in enumerate(store.list_tasks(), 1):
-        task = store.show_task(entry['id'])
+    phases, starts, drafts, totals = {}, [], [], {}
+    unavailable_usage = 0
+    for index, task in enumerate(tasks, 1):
         start = datetime.fromisoformat(task['started_at'])
         starts.append(start)
-        row = phases.setdefault(task['kind'], {'calls': 0, 'seconds': 0.0, 'failed': 0})
+        row = phases.setdefault(task['kind'], {'calls': 0, 'seconds': 0.0, 'failed': 0,
+                                                'unfinished_calls': 0, 'duration_unavailable_calls': 0})
         row['calls'] += 1
-        row['failed'] += task['status'] != 'completed'
+        row['failed'] += task['status'] in ('failed', 'timed_out', 'interrupted')
+        row['unfinished_calls'] += task['status'] == 'running'
         if task['finished_at']:
             end = datetime.fromisoformat(task['finished_at'])
             row['seconds'] += max(0, (end - start).total_seconds())
-            if task['kind'] == 'draft' and task['status'] == 'completed' and first is None:
-                first = end
-                first_calls = index
-    usages = [(store.show_task(t['id']).get('execution') or {}).get('usage') for t in store.list_tasks()]
-    totals = {}
-    for usage in usages:
+            if task['kind'] == 'draft' and task['status'] == 'completed':
+                drafts.append((end, index))
+        else:
+            row['duration_unavailable_calls'] += 1
+        usage = (task.get('execution') or {}).get('usage')
+        unavailable_usage += not isinstance(usage, dict) or not usage
         if isinstance(usage, dict):
-            for k, value in usage.items():
-                if type(value) is int:
-                    totals[k] = totals.get(k, 0) + value
-    return {'phases': phases, 'seconds_to_first_draft': (first - min(starts)).total_seconds() if first and starts else None,
-            'calls_to_first_draft': first_calls,
-            'reported_usage': totals, 'usage_unavailable_calls': sum(not isinstance(u, dict) or not u for u in usages),
-            'notice': 'CLI-reported tokens; missing usage is unknown, not zero. No inference compute estimate.'}
+            for key, count in usage.items():
+                if type(count) is int:
+                    totals[key] = totals.get(key, 0) + count
+    first = min(drafts) if drafts else None
+    return {'phases': phases, 'seconds_to_first_draft': (first[0] - min(starts)).total_seconds() if first else None,
+            'calls_to_first_draft': first[1] if first else None,
+            'reported_usage': totals, 'usage_unavailable_calls': unavailable_usage,
+            'notice': 'Known task wall-time only; missing durations/usage are unknown, not zero. No inference compute estimate.'}
+
+
+def method_summary(manifest, runs):
+    """Declared attempts stay in the denominator; uninstrumented milestones are unknown."""
+    methods = manifest.get('methods', ['baseline', 'harness'])
+    total = len(manifest['cases']['cases'])
+    summary = {}
+    for method in methods:
+        rows = [r for r in runs if r['method'] == method]
+        summary[method] = {'declared_runs': total, 'recorded_runs': len(rows),
+                           'unrecorded_runs': total - len(rows),
+                           'status_counts': dict(Counter(r['status'] for r in rows)),
+                           'saved_manuscripts': sum(r['metrics']['saved_manuscript_available'] for r in rows),
+                           'milestones': {}}
+        for kind in ('draft', 'verify', 'review'):
+            observed = [r['metrics']['milestones'][kind] for r in rows]
+            reached = sum(v is True for v in observed)
+            summary[method]['milestones'][kind] = {
+                'reached': reached, 'not_reached': sum(v is False for v in observed),
+                'unknown': total - sum(v is not None for v in observed), 'denominator': total,
+                'reached_fraction_of_declared': reached / total if total else None,
+                'notice': 'Ever accepted artifact, not current verification or academic approval. Unknowns are not failures.'}
+    return summary
+
+
+def human_fact_support(samples):
+    """Sampled human judgments only; do not turn native AI verdicts into precision."""
+    counts = Counter(f['verdict'] for sample in samples for f in sample['facts'])
+    factual = sum(counts[v] for v in ('supported', 'partial', 'contradicted', 'undetermined'))
+    assessable = factual - counts['undetermined']
+    return {'verdict_counts': dict(counts), 'sampled_factual_assertions': factual,
+            'supported_fraction_all_factual': counts['supported'] / factual if factual else None,
+            'supported_fraction_assessable': counts['supported'] / assessable if assessable else None,
+            'notice': 'Human judgments on sampled extracted assertions; undetermined retained in all-factual denominator. '
+                      'Not extraction recall, proof of evaluator independence, or AI-verifier precision.'}
 
 
 def selection_metrics(cases, ranking, k):
@@ -437,7 +536,7 @@ def metrics(root, run, case):
     draft = path / "draft.md"
     final_ids = identifiers(draft.read_text()) if draft.exists() else set()
     expected = {r["id"] for r in case["references"]}
-    result = {"expected_reference_count": len(expected), "expected_in_final_manuscript": sorted(expected & final_ids),
+    result = {"saved_manuscript_available": manuscript_available(path), "expected_reference_count": len(expected), "expected_in_final_manuscript": sorted(expected & final_ids),
               "identifiable_final_citation_ids": sorted(final_ids),
               "scope": "Identifier matching only. Missing identifiers are not proof that a paper was unread; relevance and support require human evaluation."}
     database = path / "study.sqlite3"
@@ -446,6 +545,13 @@ def metrics(root, run, case):
         import sqlite3
         conn = sqlite3.connect(database.as_uri() + "?mode=ro", uri=True)
         try:
+            task_rows = [dict(zip(('kind', 'status', 'started_at', 'finished_at', 'execution'), r))
+                         for r in conn.execute('SELECT kind,status,started_at,finished_at,execution_json FROM tasks ORDER BY id')]
+            for task in task_rows:
+                task['execution'] = json.loads(task['execution']) if task['execution'] else None
+            result['phase_metrics'] = phase_metrics_from_tasks(task_rows)
+            accepted = dict(conn.execute('SELECT kind,COUNT(*) FROM artifacts GROUP BY kind'))
+            result['milestones'] = {kind: bool(accepted.get(kind)) for kind in ('draft', 'verify', 'review')}
             observed = set()
             for row in conn.execute("SELECT doi,url,external_id FROM papers"):
                 observed.update(identifiers(" ".join(str(x) for x in row)))
@@ -463,6 +569,8 @@ def metrics(root, run, case):
             result["native_verification_scope"] = "Harness AI judgments only, not an independently comparable quality score or human ground truth."
         finally:
             conn.close()
+    else:
+        result['milestones'] = {'draft': manuscript_available(path), 'verify': None, 'review': None}
     return result
 
 
@@ -470,9 +578,11 @@ def report(output):
     root = Path(output).resolve()
     manifest = read(root / "manifest.json")
     observed_runs = [dict(run, metrics=metrics(root, run, next(c for c in manifest["cases"]["cases"] if c["id"] == run["case_id"]))) for run in manifest["runs"]]
-    result = {"human_evaluation": manifest["human_evaluation"], "limitations": manifest["limitations"], "runs": observed_runs}
+    result = {"human_evaluation": manifest["human_evaluation"], "limitations": manifest["limitations"], "runs": observed_runs,
+              'conditions': manifest.get('conditions', {'notice': 'Legacy evaluation: output conditions were not matched.'}),
+              'method_summary': method_summary(manifest, observed_runs)}
     def usage(run):
-        phases = run.get('phase_metrics')
+        phases = run.get('phase_metrics') or run.get('metrics', {}).get('phase_metrics')
         if phases:
             return phases['reported_usage'] if not phases['usage_unavailable_calls'] else None
         values = run.get('usage')
@@ -504,12 +614,27 @@ def report(output):
     result['paired_observations'] = comparisons
     if manifest.get("human_scores"):
         mapping = read(root / "private-sample-map.json")
-        result["human_scores"] = [dict(s, **mapping[s["sample_id"]]) for s in read(root / manifest["human_scores"])["samples"]]
+        score_file = read(root / manifest['human_scores'])
+        result['evaluator'] = score_file.get('evaluator', {'relationship_to_project': 'unknown'})
+        result['evaluator_independence'] = 'Self-declared, not independently verified'
+        result["human_scores"] = [dict(s, **mapping[s["sample_id"]]) for s in score_file["samples"]]
+        result['human_fact_support_by_method'] = {
+            method: human_fact_support([sample for sample in result['human_scores'] if sample['method'] == method])
+            for method in manifest.get('methods', ['baseline', 'harness'])}
+    result['human_fact_support'] = human_fact_support(result.get('human_scores', []))
     lines = ["# Exploratory evaluation", "", "Human evaluation: " + manifest["human_evaluation"], "",
              "| Case | Method | Status | Seconds |", "| --- | --- | --- | --- |"]
     for run in manifest["runs"]:
         seconds = f"{run['elapsed_seconds']:.1f}" if "elapsed_seconds" in run else "unrecorded"
         lines.append(f"| {run['case_id']} | {run['method']} | {run['status']} | {seconds} |")
+    lines += ['', '## Milestones (all declared attempts)', '',
+              '| Method | Declared | Draft reached | Verification reached | Review reached |',
+              '| --- | --- | --- | --- | --- |']
+    for method, summary in result['method_summary'].items():
+        cells = [f"{summary['milestones'][kind]['reached']}/{summary['declared_runs']} (unknown {summary['milestones'][kind]['unknown']})"
+                 for kind in ('draft', 'verify', 'review')]
+        lines.append(f"| {method} | {summary['declared_runs']} | " + ' | '.join(cells) + ' |')
+    lines += ['', 'Milestones show accepted historical artifacts; saved partial manuscripts remain eligible for human evaluation.']
     lines += ["", "## Limits", ""] + ["- " + x for x in manifest["limitations"]]
     lines += ["", "## Observations", "", "| Case | Method | Reference IDs in final / limited set | Native fact verification |", "| --- | --- | --- | --- |"]
     for run in observed_runs:
