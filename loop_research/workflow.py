@@ -296,10 +296,11 @@ class ResearchWorkflow:
     def data_for(self, kind, document=None, page=None, choices=None):
         state = self.store.study_state()
         if kind == 'selection':
-            data = selection.data(self.store, self.human_guidance(), document)
             plan = self.research_plan()
+            focus = self.plan_work(plan, document) if plan else None
+            data = selection.data(self.store, self.human_guidance(), document, focus=focus)
             if plan:
-                data['review_followup'] = self.plan_work(plan, document)
+                data['review_followup'] = focus
             return data
         if kind == "orientation":
             return {"question": state["question"], "audience": state["audience"], "venue": state["venue"],

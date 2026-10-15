@@ -4,6 +4,7 @@ import json
 import re
 from .common import ResearchError, label
 from .schema import obj, array, string
+from .assertion_spans import scope_loss
 
 CHECK = obj(path=string(minimum=1, maximum=300), operator=string(('equals', 'not_equals', 'contains', 'all_equal')),
             expected_json=string(minimum=1, maximum=2000))
@@ -97,6 +98,7 @@ def normalize(data, claims, manuscript):
         ids.add(item['id'])
         item['start'], item['end'] = locate(manuscript[item['block_id']][item['field']], item['text'], item['occurrence'])
         item['context_id'] = item['block_id'] + '.' + item['field']
+        item['scope_check'] = scope_loss(manuscript[item['block_id']][item['field']], item['start'], item['end'])
         checks = []
         for raw_check in item['checks']:
             check = dict(raw_check)
@@ -142,11 +144,28 @@ def normalize(data, claims, manuscript):
                 absence = re.search(r'not\s+human[- ]verified|(?:no|never|without)\b.{0,50}\b(?:human|manual)\b|人間による確認.{0,12}(?:ない|無し)|人間.{0,12}未確認', item['text'], re.IGNORECASE)
                 if absence:
                     check.update(verdict='undetermined', reason='Evidence status cannot establish absence of human verification activity')
+            # Recorded observations cannot establish exclusive material use or an
+            # unqualified absence of real-world activity, even with intact syntax.
+            path = check['path'].removeprefix('/records')
+            activity = re.search(r'\b(?:no|never|without)\b.{0,100}\b(?:tools?|searches|reading|verification)\b|\bonly supplied material\b', item['text'], re.I)
+            recorded = re.search(r'\b(?:ledger|records?|recorded|observed)\b', item['text'], re.I)
+            if check['verdict'] == 'supported' and activity and not recorded and path.startswith((
+                    '/author_tool_call_count', '/raw_search_responses_supplied', '/paper_read_pages')):
+                check.update(verdict='undetermined', reason='Stored observations do not establish exhaustive absence of activity or exclusive material use')
             checks.append(check)
         verdicts = {c['verdict'] for c in checks}
+        if item['scope_check']['omitted_cues']:
+            verdicts.add('undetermined')
+            # Keep deterministic expression results separate from span validity.
+            item['scope_warning'] = 'Enclosing sentence has scope cues outside extracted span; re-extract with negation and restrictions preserved.'
         item['extraction_reason'] = item['reason']
         item['reason'] = 'Host ledger checks: ' + '; '.join(c['path'] + ': ' + c['verdict'] for c in checks)
-        item.update(checks=checks, verdict='contradicted' if 'contradicted' in verdicts else 'undetermined' if 'undetermined' in verdicts else 'supported',
+        if item['scope_check']['omitted_cues']:
+            item['reason'] = 'Host scope gate: ' + item['scope_warning'] + ' ' + item['reason']
+        verdict = ('undetermined' if item['scope_check']['omitted_cues'] else
+                   'contradicted' if 'contradicted' in verdicts else
+                   'undetermined' if 'undetermined' in verdicts else 'supported')
+        item.update(checks=checks, verdict=verdict,
                     snapshot_sha256=ledger['sha256'], host_reason='Host checks extracted expression; its mapping to the manuscript still requires review.',
                     qualification='Stored records only; not independent confirmation of activity or literature truth.')
         result.append(item)

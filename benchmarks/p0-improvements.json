@@ -1,0 +1,284 @@
+{
+  "date": "2026-10-15",
+  "kind": "offline diagnostics, not fixed-model comparative experiment",
+  "before": {
+    "source_sha256": {
+      "evaluation.py": "eff45a1f8461c8360f4728243f2bb0b423e4f27cf58808959eff9f43278b56cd",
+      "selection.py": "e92923a08b3698c4d4a87651f0f8749a4807ac492bf131858ff59a02dfcc6a06",
+      "budget.py": "a1c728044e2382a50b8ba85a5cd7037c5e3fbaa58fcb085b49381c1fc81c237a",
+      "workflow.py": "d9f136d7408f4f89851921a76a2d955d930bc9b28cbee717a296e4eaf715f1bd",
+      "workflow_store.py": "f5ed154ebc1653bbd69206f50dc5e83601c58b65dfbfb693167dd92399c3826d",
+      "verification.py": "88bdcac58a40c177b69a597d3809797e4b233ebd30b3b87d31cb4a8b93bd762e",
+      "ledger.py": "520ee44e308a7a821a1d928338205907bd86245d62d6cf6d3077e993f7621b1f"
+    },
+    "comparison_output_words": {
+      "baseline": [
+        1200,
+        2000
+      ],
+      "bounded_harness": [
+        600,
+        900
+      ]
+    },
+    "synthetic_short_page": {
+      "characters": 240,
+      "previous_snippet_characters": 487,
+      "unique_source_characters": 240
+    },
+    "notice": "Before-change code inspection and deterministic character accounting, not model quality/latency."
+  },
+  "after_source_sha256": {
+    "evaluation.py": "0eb739bd310c82fa4db8cef4abdf1d1dff580e4d8bff9d3800c107aa31c7d173",
+    "selection.py": "672809110814169491ceac2c9b9e47c36acb091a3497c81ca1c683ebabf63641",
+    "snippet_eval.py": "ab678044659c1b480b0c11f3f589d875694b6436afce25ba50cc3c9a5bd47a2a",
+    "budget.py": "a4d1cce7b022a33b87541ef3bfefa9b43293b57e40c70e40a81bfa9433d76204",
+    "workflow.py": "ac7641c862379237e58828ae5bdda226c553b655ea00ec77f8a33253cf75caeb",
+    "workflow_store.py": "9e75a67dcf2ed4aefb12c4e76570fa20cc5b300e400ae2ffa5590c977c59fcbf"
+  },
+  "new_model_calls": 0,
+  "comparison_protocol": {
+    "old_baseline_words": [
+      1200,
+      2000
+    ],
+    "old_bounded_harness_words": [
+      600,
+      900
+    ],
+    "new_both_words": [
+      600,
+      900
+    ],
+    "notice": "Instruction parity verified; actual manuscript length and quality not measured."
+  },
+  "historical_audit": {
+    "runs_inspected": 12,
+    "databases_inspected": 8,
+    "new_phase_metrics_available_from_saved_db": 3,
+    "all_databases_unchanged": true,
+    "notice": "Existing developmental attempts, overlapping inputs; no independent sample or new model inference."
+  },
+  "snippet_ablation": {
+    "cases": [
+      {
+        "case_id": "middle-limit",
+        "targets": 1,
+        "edges": {
+          "targets_exposed": 0,
+          "candidate_pages": 1,
+          "source_characters_sent": 1200,
+          "snippet_characters_sent": 1207,
+          "selected_pages": [
+            1
+          ]
+        },
+        "structured": {
+          "targets_exposed": 1,
+          "candidate_pages": 1,
+          "source_characters_sent": 1200,
+          "snippet_characters_sent": 1214,
+          "selected_pages": [
+            1
+          ]
+        }
+      },
+      {
+        "case_id": "middle-query",
+        "targets": 1,
+        "edges": {
+          "targets_exposed": 0,
+          "candidate_pages": 1,
+          "source_characters_sent": 1200,
+          "snippet_characters_sent": 1207,
+          "selected_pages": [
+            1
+          ]
+        },
+        "structured": {
+          "targets_exposed": 1,
+          "candidate_pages": 1,
+          "source_characters_sent": 1200,
+          "snippet_characters_sent": 1214,
+          "selected_pages": [
+            1
+          ]
+        }
+      },
+      {
+        "case_id": "unsampled-limit",
+        "targets": 1,
+        "edges": {
+          "targets_exposed": 0,
+          "candidate_pages": 16,
+          "source_characters_sent": 606,
+          "snippet_characters_sent": 718,
+          "selected_pages": [
+            1,
+            8,
+            14,
+            21,
+            27,
+            34,
+            41,
+            47,
+            54,
+            60,
+            67,
+            74,
+            80,
+            87,
+            93,
+            100
+          ]
+        },
+        "structured": {
+          "targets_exposed": 1,
+          "candidate_pages": 16,
+          "source_characters_sent": 343,
+          "snippet_characters_sent": 343,
+          "selected_pages": [
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8,
+            15,
+            29,
+            42,
+            43,
+            58,
+            72,
+            86,
+            100
+          ]
+        }
+      },
+      {
+        "case_id": "short-no-duplication",
+        "targets": 1,
+        "edges": {
+          "targets_exposed": 1,
+          "candidate_pages": 1,
+          "source_characters_sent": 100,
+          "snippet_characters_sent": 107,
+          "selected_pages": [
+            1
+          ]
+        },
+        "structured": {
+          "targets_exposed": 1,
+          "candidate_pages": 1,
+          "source_characters_sent": 50,
+          "snippet_characters_sent": 50,
+          "selected_pages": [
+            1
+          ]
+        }
+      },
+      {
+        "case_id": "endpoints-control",
+        "targets": 2,
+        "edges": {
+          "targets_exposed": 2,
+          "candidate_pages": 1,
+          "source_characters_sent": 1200,
+          "snippet_characters_sent": 1207,
+          "selected_pages": [
+            1
+          ]
+        },
+        "structured": {
+          "targets_exposed": 2,
+          "candidate_pages": 1,
+          "source_characters_sent": 1200,
+          "snippet_characters_sent": 1214,
+          "selected_pages": [
+            1
+          ]
+        }
+      },
+      {
+        "case_id": "two-distant-limits",
+        "targets": 2,
+        "edges": {
+          "targets_exposed": 0,
+          "candidate_pages": 1,
+          "source_characters_sent": 1200,
+          "snippet_characters_sent": 1207,
+          "selected_pages": [
+            1
+          ]
+        },
+        "structured": {
+          "targets_exposed": 1,
+          "candidate_pages": 1,
+          "source_characters_sent": 1200,
+          "snippet_characters_sent": 1214,
+          "selected_pages": [
+            1
+          ]
+        }
+      }
+    ],
+    "totals": {
+      "edges": {
+        "targets_exposed": 3,
+        "candidate_pages": 21,
+        "source_characters_sent": 5506,
+        "snippet_characters_sent": 5653
+      },
+      "structured": {
+        "targets_exposed": 7,
+        "candidate_pages": 21,
+        "source_characters_sent": 5193,
+        "snippet_characters_sent": 5249
+      }
+    },
+    "targets": 8,
+    "notice": "Synthetic developer-authored excerpt exposure only; not semantic relevance, actual reading, discovery recall, model latency or research quality."
+  },
+  "snippet_manifest": {
+    "cases_sha256": "8147db0dcd48e180d19cc674bcb9fda2ce0a478d22a7e8ba8528aadcde662d50",
+    "source_sha256": {
+      "selection.py": "672809110814169491ceac2c9b9e47c36acb091a3497c81ca1c683ebabf63641",
+      "snippet_eval.py": "ab678044659c1b480b0c11f3f589d875694b6436afce25ba50cc3c9a5bd47a2a"
+    },
+    "model_calls": 0,
+    "status": "completed"
+  },
+  "failure_packet_fixture": {
+    "attempts": 2,
+    "failed_with_saved_manuscript": 1,
+    "before_eligible_manuscripts": 0,
+    "after_eligible_manuscripts": 1,
+    "notice": "Synthetic regression fixture, not a measured improvement in real drafting success."
+  },
+  "remaining_unverified": [
+    "Live drafting/verification/review attainment and latency",
+    "Real-literature excerpt recall",
+    "Independent human quality assessment and source support",
+    "AI-verifier precision against independent annotations",
+    "Adaptive scheduler beyond existing checkpoints and reserve policy"
+  ],
+  "phase_accounting_fixture": {
+    "tasks": 2,
+    "previous_show_task_calls_from_code": 4,
+    "current_measured_show_task_calls": 2,
+    "current_measured_list_tasks_calls": 1,
+    "notice": "Isolated phase_metrics helper regression; no claim of measured end-to-end latency or inference savings. Harness reuses already-loaded task rows."
+  },
+  "software_validation": {
+    "command": "python3 -m unittest discover -s tests -t .",
+    "tests": 156,
+    "result": "passed",
+    "focused_command": "python3 -m unittest tests.test_evaluation_integrity tests.test_snippets",
+    "focused_tests": 15,
+    "focused_result": "passed",
+    "diff_check": "passed",
+    "notice": "Offline tests and mocks; no new model calls or independent human judgments."
+  }
+}

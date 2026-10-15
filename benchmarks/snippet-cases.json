@@ -1,0 +1,197 @@
+{
+  "version": 1,
+  "annotation": "Synthetic developer-authored target spans, not real-literature relevance ground truth. Includes a two-distant-target case to expose bounded-window omissions.",
+  "cases": [
+    {
+      "id": "middle-limit",
+      "query": "verification burden",
+      "pages": [
+        "Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. \nLimitations\nNo significant benefit was observed under distribution shift.\nBackground. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. "
+      ],
+      "page_limit": 16,
+      "targets": [
+        {
+          "page": 1,
+          "quote": "No significant benefit was observed under distribution shift."
+        }
+      ]
+    },
+    {
+      "id": "middle-query",
+      "query": "verification effort",
+      "pages": [
+        "Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. \nResults\nVerification effort increased for novice readers.\nBackground. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. "
+      ],
+      "page_limit": 16,
+      "targets": [
+        {
+          "page": 1,
+          "quote": "Verification effort increased for novice readers."
+        }
+      ]
+    },
+    {
+      "id": "unsampled-limit",
+      "query": "benchmark deployment",
+      "pages": [
+        "Background page 1.",
+        "Background page 2.",
+        "Background page 3.",
+        "Background page 4.",
+        "Background page 5.",
+        "Background page 6.",
+        "Background page 7.",
+        "Background page 8.",
+        "Background page 9.",
+        "Background page 10.",
+        "Background page 11.",
+        "Background page 12.",
+        "Background page 13.",
+        "Background page 14.",
+        "Background page 15.",
+        "Background page 16.",
+        "Background page 17.",
+        "Background page 18.",
+        "Background page 19.",
+        "Background page 20.",
+        "Background page 21.",
+        "Background page 22.",
+        "Background page 23.",
+        "Background page 24.",
+        "Background page 25.",
+        "Background page 26.",
+        "Background page 27.",
+        "Background page 28.",
+        "Background page 29.",
+        "Background page 30.",
+        "Background page 31.",
+        "Background page 32.",
+        "Background page 33.",
+        "Background page 34.",
+        "Background page 35.",
+        "Background page 36.",
+        "Background page 37.",
+        "Background page 38.",
+        "Background page 39.",
+        "Background page 40.",
+        "Background page 41.",
+        "Limitations: the reported benchmark excludes deployment failures.",
+        "Background page 43.",
+        "Background page 44.",
+        "Background page 45.",
+        "Background page 46.",
+        "Background page 47.",
+        "Background page 48.",
+        "Background page 49.",
+        "Background page 50.",
+        "Background page 51.",
+        "Background page 52.",
+        "Background page 53.",
+        "Background page 54.",
+        "Background page 55.",
+        "Background page 56.",
+        "Background page 57.",
+        "Background page 58.",
+        "Background page 59.",
+        "Background page 60.",
+        "Background page 61.",
+        "Background page 62.",
+        "Background page 63.",
+        "Background page 64.",
+        "Background page 65.",
+        "Background page 66.",
+        "Background page 67.",
+        "Background page 68.",
+        "Background page 69.",
+        "Background page 70.",
+        "Background page 71.",
+        "Background page 72.",
+        "Background page 73.",
+        "Background page 74.",
+        "Background page 75.",
+        "Background page 76.",
+        "Background page 77.",
+        "Background page 78.",
+        "Background page 79.",
+        "Background page 80.",
+        "Background page 81.",
+        "Background page 82.",
+        "Background page 83.",
+        "Background page 84.",
+        "Background page 85.",
+        "Background page 86.",
+        "Background page 87.",
+        "Background page 88.",
+        "Background page 89.",
+        "Background page 90.",
+        "Background page 91.",
+        "Background page 92.",
+        "Background page 93.",
+        "Background page 94.",
+        "Background page 95.",
+        "Background page 96.",
+        "Background page 97.",
+        "Background page 98.",
+        "Background page 99.",
+        "Background page 100."
+      ],
+      "page_limit": 16,
+      "targets": [
+        {
+          "page": 42,
+          "quote": "Limitations: the reported benchmark excludes deployment failures."
+        }
+      ]
+    },
+    {
+      "id": "short-no-duplication",
+      "query": "causality",
+      "pages": [
+        "The supplied passage does not establish causality."
+      ],
+      "page_limit": 16,
+      "targets": [
+        {
+          "page": 1,
+          "quote": "The supplied passage does not establish causality."
+        }
+      ]
+    },
+    {
+      "id": "endpoints-control",
+      "query": "evaluation",
+      "pages": [
+        "The opening describes the evaluation. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background.The conclusion remains qualified."
+      ],
+      "page_limit": 16,
+      "targets": [
+        {
+          "page": 1,
+          "quote": "The opening describes the evaluation."
+        },
+        {
+          "page": 1,
+          "quote": "The conclusion remains qualified."
+        }
+      ]
+    },
+    {
+      "id": "two-distant-limits",
+      "query": "benefit",
+      "pages": [
+        "Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Limitations: no benefit in the first experiment. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background.Limitations: no benefit in the second experiment. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background. Background."
+      ],
+      "page_limit": 16,
+      "targets": [
+        {
+          "page": 1,
+          "quote": "Limitations: no benefit in the first experiment."
+        },
+        {
+          "page": 1,
+          "quote": "Limitations: no benefit in the second experiment."
+        }
+      ]
+    }
+  ]
+}

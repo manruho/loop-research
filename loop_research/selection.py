@@ -1,4 +1,6 @@
 """Bounded semantic selection; selection snippets are never recorded as readings."""
+import json
+import re
 from .schema import obj, array, string
 from .common import ResearchError
 
@@ -18,19 +20,88 @@ PROMPT = (
 )
 
 
-def data(store, guidance, document=None):
+LIMITATIONS = re.compile(r'\b(?:limitations?|caveats?|counterexamples?|null results?|no significant|failed to|threats to validity)\b', re.I)
+STOP = {'should', 'would', 'could', 'about', 'which', 'their', 'there', 'these', 'those', 'with', 'from', 'that', 'this', 'have', 'been', 'research'}
+
+
+def terms(text):
+    return {word.lower() for word in re.findall(r'[A-Za-z]{4,}', text)} - STOP
+
+
+def priority(text, query_terms):
+    # Capped distinct terms avoid a repetition-heavy page dominating selection.
+    return len(terms(text) & query_terms) + 3 * bool(LIMITATIONS.search(text))
+
+
+def uniform_indices(count, limit):
+    if count <= limit:
+        return list(range(count))
+    return [round(i * (count - 1) / (limit - 1)) for i in range(limit)] if limit > 1 else [0]
+
+
+def page_sample(pages, limit, query_terms, structured=True):
+    if len(pages) <= limit or not structured:
+        return [pages[i] for i in uniform_indices(len(pages), limit)]
+    # Keep endpoints and uniform coverage, then spend remaining slots on local
+    # relevance/limitations. This is a heuristic, not semantic truth or reading.
+    indices = set(uniform_indices(len(pages), min(limit, max(2, (limit + 1) // 2))))
+    ranked = sorted(range(len(pages)), key=lambda i: (-priority(pages[i]['text'], query_terms), i))
+    for i in ranked:
+        if len(indices) >= limit:
+            break
+        indices.add(i)
+    return [pages[i] for i in sorted(indices)]
+
+
+def snippet(text, query_terms, structured=True):
+    if not structured:
+        # Exact historical behavior for ablations, including short-page duplication.
+        return {'snippet': text[:600] + '\n[...]\n' + text[-600:],
+                'snippet_spans': [{'start': 0, 'end': min(600, len(text))},
+                                  {'start': max(0, len(text) - 600), 'end': len(text)}]}
+    if len(text) <= 1200:
+        ranges = [(0, len(text))]
+    else:
+        # Preserve beginning/end and expose one 600-character interior window.
+        # Candidate anchors include headings/paragraphs and query/limitation hits.
+        anchors = {len(text) // 2}
+        # At most one query hit and one limitation hit per spatial bucket:
+        # repetition-heavy pages cannot create an unbounded scoring workload.
+        buckets = {}
+        for match in re.finditer(r"[A-Za-z]{4,}", text):
+            if match.group().lower() in query_terms:
+                buckets.setdefault(match.start() * 64 // len(text), match.start())
+        anchors.update(buckets.values())
+        buckets = {}
+        for match in LIMITATIONS.finditer(text):
+            buckets.setdefault(match.start() * 64 // len(text), match.start())
+        anchors.update(buckets.values())
+        candidates = []
+        for anchor in sorted(anchors):
+            start = max(300, min(len(text) - 900, anchor - 150))
+            end = start + 600
+            candidates.append((priority(text[start:end], query_terms), start, end))
+        _, start, end = max(candidates, key=lambda item: (item[0], -abs((item[1] + 300) - len(text) // 2), -item[1]))
+        ranges = [(0, 300), (start, end), (len(text) - 300, len(text))]
+    return {'snippet': '\n[...]\n'.join(text[a:b] for a, b in ranges),
+            'snippet_spans': [{'start': a, 'end': b} for a, b in ranges]}
+
+
+def data(store, guidance, document=None, focus=None):
     state = store.study_state()
     if document:
         doc = store.document_row(document)
         pages = list(store.db.execute('SELECT page,text FROM pages WHERE document_id=? ORDER BY page', (doc['id'],)))
-        # Uniform sampling prevents term frequency from permanently excluding pages.
         pages = [p for p in pages if p['text'].strip()]
         limit = state['settings']['selection_page_limit']
-        if len(pages) > limit:
-            pages = [pages[round(i * (len(pages) - 1) / (limit - 1))] for i in range(limit)] if limit > 1 else pages[:1]
-        candidates = [{'id': f"{document}:{p['page']}", 'page': p['page'],
-                       'snippet': p['text'][:600] + '\n[...]\n' + p['text'][-600:]} for p in pages]
-        target = {'document_id': document, 'sha256': doc['sha256']}
+        page_count = len(pages)
+        structured = bool(state['settings'].get('structured_snippets', 1))
+        query_terms = terms(state['question'] + ' ' + json.dumps([guidance, focus], ensure_ascii=False))
+        pages = page_sample(pages, limit, query_terms, structured)
+        candidates = [dict(id=f"{document}:{p['page']}", page=p['page'],
+                           **snippet(p['text'], query_terms, structured)) for p in pages]
+        target = {'document_id': document, 'sha256': doc['sha256'], 'nonempty_pages': page_count,
+                  'omitted_pages': page_count - len(pages), 'structured_snippets': structured}
     else:
         candidates = []
         for p in store.list_papers():
@@ -44,7 +115,7 @@ def data(store, guidance, document=None):
             candidates = manual + [rest[round(i * (len(rest) - 1) / (slots - 1))] for i in range(slots)]
         target = {'document_id': None}
     return {'question': state['question'], 'human_guidance': guidance, 'target': target,
-            'candidates': candidates, 'selection_contract': 2,
+            'candidates': candidates, 'selection_contract': 3,
             'scope': 'Metadata and bounded selection snippets only; not substantive reading or evidence acquisition.'}
 
 

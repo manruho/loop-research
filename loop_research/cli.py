@@ -32,12 +32,13 @@ def study_options(command, steps=False):
     command.add_argument("--queries", type=int, dest="query_limit")
     command.add_argument('--draft-checkpoint-readings', type=int, help='暫定草稿に進む読解件数。0は従来の探索優先')
     command.add_argument('--semantic-selection', type=int, choices=[0, 1])
-    command.add_argument('--selection-page-limit', type=int, help='選別用に均等抽出するページ数。1〜60、既定16')
+    command.add_argument('--structured-snippets', type=int, choices=[0, 1], help='関連箇所を含む選別用抜粋。0は旧冒頭・末尾方式')
+    command.add_argument('--selection-page-limit', type=int, help='選別用に均等位置・関連箇所から選ぶページ数。1〜60、既定16')
 
 
 def configure_options(store, args):
     settings = {key: getattr(args, key) for key in (
-        "model", "review_model", "review_effort", "citation_seeds", "citation_limit", "citation_budget", "timeout", "reasoning_effort", "provider", "paper_limit", "pages_per_document", "query_limit", "search_budget", 'draft_checkpoint_readings', 'semantic_selection', 'selection_page_limit'
+        "model", "review_model", "review_effort", "citation_seeds", "citation_limit", "citation_budget", "timeout", "reasoning_effort", "provider", "paper_limit", "pages_per_document", "query_limit", "search_budget", 'draft_checkpoint_readings', 'semantic_selection', 'selection_page_limit', 'structured_snippets'
     ) if getattr(args, key, None) is not None}
     if settings:
         store.configure_study(getattr(args, "reason", None) or "CLI実行時の設定", settings=settings)
@@ -61,6 +62,9 @@ def parser():
     codex.add_subparsers(dest="action", required=True).add_parser("status")
     evaluation = commands.add_parser("eval", help="公開課題での探索的比較と人間評価")
     actions = evaluation.add_subparsers(dest="action", required=True)
+    snippets = actions.add_parser('snippets')
+    snippets.add_argument('--output', required=True)
+    snippets.add_argument('--cases', default='benchmarks/snippet-cases.json')
     retrieval = actions.add_parser('selection')
     retrieval.add_argument('--output', required=True)
     retrieval.add_argument('--cases', default='benchmarks/selection-cases.json')
@@ -73,6 +77,13 @@ def parser():
     extraction.add_argument("--model", required=True)
     extraction.add_argument("--cases", default="benchmarks/extraction-cases.json")
     extraction.add_argument("--timeout", type=float, default=300)
+    regression = actions.add_parser("verification-regression")
+    regression.add_argument("--output", required=True)
+    source = regression.add_mutually_exclusive_group(required=True)
+    source.add_argument("--model")
+    source.add_argument("--result")
+    regression.add_argument("--cases", default="benchmarks/verification-cases.json")
+    regression.add_argument("--timeout", type=float, default=300)
     evaluate = actions.add_parser("run")
     evaluate.add_argument("--output", required=True)
     evaluate.add_argument("--cases", default="benchmarks/position-papers.json")
@@ -80,7 +91,7 @@ def parser():
     evaluate.add_argument("--review-model", required=True)
     evaluate.add_argument("--seconds", type=int, default=1800)
     evaluate.add_argument("--resume", action="store_true")
-    evaluate.add_argument('--methods', nargs='+', choices=['baseline', 'harness', 'harness-no-checkpoint', 'harness-lexical', 'harness-no-citations'])
+    evaluate.add_argument('--methods', nargs='+', choices=['baseline', 'harness', 'harness-no-checkpoint', 'harness-lexical', 'harness-no-citations', 'harness-edge-snippets'])
     packet = actions.add_parser("packet")
     packet.add_argument("--output", required=True)
     packet.add_argument("--review-model", required=True)
@@ -293,7 +304,7 @@ def dispatch(store, args):
     if args.command == "study":
         if args.action == "configure":
             settings = {key: getattr(args, key) for key in (
-                "model", "review_model", "review_effort", "citation_seeds", "citation_limit", "citation_budget", "timeout", "reasoning_effort", "provider", "paper_limit", "pages_per_document", "query_limit", "search_budget", 'draft_checkpoint_readings', 'semantic_selection', 'selection_page_limit'
+                "model", "review_model", "review_effort", "citation_seeds", "citation_limit", "citation_budget", "timeout", "reasoning_effort", "provider", "paper_limit", "pages_per_document", "query_limit", "search_budget", 'draft_checkpoint_readings', 'semantic_selection', 'selection_page_limit', 'structured_snippets'
             ) if getattr(args, key, None) is not None}
             return store.configure_study(args.reason, args.question, args.audience, args.venue, settings)
         if args.action == "select":
@@ -422,6 +433,12 @@ def main(argv=None):
             if args.action == "extraction":
                 from .extraction_eval import run
                 result = run(args.output, args.model, args.cases, args.timeout)
+            elif args.action == 'verification-regression':
+                from .verification_eval import run
+                result = run(args.output, args.model, args.cases, args.timeout, args.result)
+            elif args.action == 'snippets':
+                from .snippet_eval import run
+                result = run(args.output, args.cases)
             elif args.action == 'selection':
                 from .retrieval_eval import run
                 result = run(args.output, args.cases, args.model, args.ranking, args.k, args.timeout)
