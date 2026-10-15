@@ -15,7 +15,7 @@ PREFIX_KINDS = {value: key for key, value in ARTIFACT_PREFIXES.items()}
 DEFAULT_SETTINGS = {"provider": "arxiv", "paper_limit": 12, "pages_per_document": 2,
                     "query_limit": 6, "search_budget": 12, "model": None, "timeout": 180, "reasoning_effort": "medium", "review_model": None, "review_effort": "low",
                     "citation_seeds": 3, "citation_limit": 10, "citation_budget": 30,
-                    "draft_checkpoint_readings": 2, "semantic_selection": 1}
+                    "draft_checkpoint_readings": 2, "semantic_selection": 1, 'selection_page_limit': 16}
 OWNER_SCHEMA = """
 ALTER TABLE searches ADD COLUMN owner_pid INTEGER;
 ALTER TABLE searches ADD COLUMN owner_identity TEXT;
@@ -129,6 +129,8 @@ class WorkflowStore:
             for key, maximum in (("draft_checkpoint_readings", 20), ("semantic_selection", 1)):
                 if type(merged[key]) is not int or not 0 <= merged[key] <= maximum:
                     raise ResearchError(f"{key}が有効な範囲にありません。")
+            if type(merged['selection_page_limit']) is not int or not 1 <= merged['selection_page_limit'] <= 60:
+                raise ResearchError('selection_page_limitは1〜60の整数です。')
             if merged["review_effort"] not in ("low", "medium", "high", "xhigh", "max", "ultra"):
                 raise ResearchError("査読の推論の強さが不正です。")
             if merged["review_model"] and merged["model"] == merged["review_model"]:
